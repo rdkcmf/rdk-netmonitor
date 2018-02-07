@@ -56,9 +56,13 @@ if [ $ifc == $WIFI_INTERFACE ] || [ $ifc == $MOCA_INTERFACE ] || [ $ifc == $LAN_
    if [ "x$cmd" == "xadd" ] && [ "x$flags" == "xglobal" ]; then
      $IPTABLE_CMD -I INPUT -s $addr -p tcp --dport 22 -j ACCEPT
      $IPTABLE_CMD -I OUTPUT -o lo -p tcp -s $addr -d $addr -j ACCEPT
-     dmclipid=`pidof dimclient`
-     if [ "x$dmclipid" != "x" ]; then
-        kill -9 $dmclipid
+     tr69agent_startup_script_pid=`ps -ef | grep '\/usr\/bin\/start.sh' | tr -s " " | cut -d ' ' -f2`
+     if [ "x$tr69agent_startup_script_pid" != "x" ]; then
+        kill -9 $tr69agent_startup_script_pid
+     fi
+     tr69agent_pid=`pidof dimclient`
+     if [ "x$tr69agent_pid" != "x" ]; then
+        kill -9 $tr69agent_pid
      fi
    fi
 
