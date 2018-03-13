@@ -23,6 +23,7 @@ Requires=network-online.target var-lib.mount
 
 [Service]
 Type=forking
+SyslogIdentifier="nlmon"
 PIDFile=/run/nlmon.pid
 ExecStart=/bin/sh -c "/usr/bin/nlmon& "
 ExecReload=/bin/kill -HUP $(/bin/cat /run/nlmon.pid)

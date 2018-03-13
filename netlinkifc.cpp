@@ -106,6 +106,8 @@ void NetLinkIfc::initialize()
     stateMachine[eNETIFC_STATE_RUNNING][eNETIFC_EVENT_ADD_IPROUTE] = &NetLinkIfc::addiproute;
     stateMachine[eNETIFC_STATE_RUNNING][eNETIFC_EVENT_DELETE_IP6ROUTE] = &NetLinkIfc::deleteip6route;
     stateMachine[eNETIFC_STATE_RUNNING][eNETIFC_EVENT_DELETE_IPROUTE] = &NetLinkIfc::deleteiproute;
+    stateMachine[eNETIFC_STATE_RUNNING][eNETIFC_EVENT_ADD_LINK] = &NetLinkIfc::addlink;
+    stateMachine[eNETIFC_STATE_RUNNING][eNETIFC_EVENT_DELETE_LINK] = &NetLinkIfc::deletelink;
     //stateMachine[eNETIFC_STATE_RUNNING][eNETIFC_EVENT_REINITIALIZE] = &NetLinkIfc::reinitialize;
 
     struct nlmsghdr   hdr;
@@ -145,14 +147,14 @@ void NetLinkIfc::run(bool forever)
    //2. if selected to run forever wait till thread dies.
    
    std::thread recvThrd(NetLinkIfc::receiveMsg,this);
-   ofstream pidfile("/run/nlmon.pid",ios::out);
-   if (pidfile.is_open())
-   {
-      pidfile<<getpid()<<"\n";
-      pidfile.close();
-   }
    if (forever)
    {
+       ofstream pidfile("/run/nlmon.pid",ios::out);
+       if (pidfile.is_open())
+       {
+           pidfile<<getpid()<<"\n";
+           pidfile.close();
+       }
        recvThrd.join();
    }
    else
@@ -224,6 +226,19 @@ void NetLinkIfc::publish(NlType type,string args)
          i->invoke(args);
       }
    }
+}
+
+void NetLinkIfc::addlink(string str)
+{
+    std::lock_guard<std::recursive_mutex> guard(g_state_mutex);
+    string msgArgs = str + " add";
+    publish(NlType::link,msgArgs);
+}
+void NetLinkIfc::deletelink(string str)
+{
+    std::lock_guard<std::recursive_mutex> guard(g_state_mutex);
+    string msgArgs = str + " delete";
+    publish(NlType::link,msgArgs);
 }
 
 void NetLinkIfc::addipaddr(string str)
@@ -399,6 +414,7 @@ void NetLinkIfc::processLinkMsg(struct nlmsghdr* nlh)
 
    netifcEvent event = eNETIFC_EVENT_UNKNOWN;
    struct ifinfomsg* iface = (struct ifinfomsg*)nlmsg_data(nlh);
+   unsigned int oper_state=0;
    struct nlattr *attrs[IFLA_MAX];
    for (int i =0;i<IFLA_MAX;++i)
    {
@@ -417,17 +433,33 @@ void NetLinkIfc::processLinkMsg(struct nlmsghdr* nlh)
       {
          event = eNETIFC_EVENT_ADD_IFC;
          m_interfaceMap[iface->ifi_index] = (char *) nla_data(attrs[IFLA_IFNAME]);
+         if(attrs[IFLA_OPERSTATE] != NULL)
+         {
+             oper_state = static_cast<unsigned int>(*(char*) nla_data(attrs[IFLA_OPERSTATE]));
+         }
 #ifdef _DEBUG_
-         cout<<"ADDING INTERFACE: IF INDEX = "<<iface->ifi_index<<" ; INTERFACE NAME = "<<m_interfaceMap[iface->ifi_index]<<endl;
+         cout<<"ADDING INTERFACE: IF INDEX = "<<iface->ifi_index<<" ; INTERFACE NAME = "<<m_interfaceMap[iface->ifi_index]<<" ; OPER STATE = "<<oper_state<<endl;
 #endif
+         string msgArgs = m_interfaceMap[iface->ifi_index];
+         if(oper_state == IF_OPER_UP) //IF_OPER_UP
+         {
+             runStateMachine(eNETIFC_EVENT_ADD_LINK,msgArgs);
+         }
+         else if(oper_state == IF_OPER_DOWN) //IF_OPER_DOWN
+         {
+             runStateMachine(eNETIFC_EVENT_DELETE_LINK,msgArgs);
+         }
       }
       else if (nlh->nlmsg_type == RTM_DELLINK)
       {
-         event = eNETIFC_EVENT_DELETE_IFC;
+	 event = eNETIFC_EVENT_DELETE_IFC;
          std::pair <std::multimap<int,ipaddr>::iterator, std::multimap<int,ipaddr>::iterator> ret = m_ipAddrMap.equal_range(iface->ifi_index);
          for (std::multimap<int,ipaddr>::iterator iter = ret.first; iter != ret.second;++iter)
          {
             string msgArgs = m_interfaceMap[iface->ifi_index] + ";" + iter->second.address + ";" + (iter->second.global ? "global":"local");
+#ifdef _DEBUG_
+         cout<<"DELETING INTERFACE: IF INDEX = "<<iface->ifi_index<<" ; INTERFACE NAME = "<<m_interfaceMap[iface->ifi_index]<<endl;
+#endif
             char addrStr[32];
             if (inet_pton(AF_INET,iter->second.address.c_str(),addrStr))
             {

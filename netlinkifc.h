@@ -67,6 +67,8 @@ typedef enum
    eNETIFC_EVENT_ADD_IPROUTE,
    eNETIFC_EVENT_DELETE_IP6ROUTE,
    eNETIFC_EVENT_DELETE_IPROUTE,
+   eNETIFC_EVENT_ADD_LINK,
+   eNETIFC_EVENT_DELETE_LINK,
    eNETIFC_EVENT_REINITIALIZE,
    eNETIFC_EVENT_DONE,
    eNETIFC_EVENT_UNKNOWN = -1,
@@ -118,6 +120,8 @@ private:
         void addip6route(string);
         void deleteiproute(string);
         void deleteip6route(string);
+        void addlink(string);
+        void deletelink(string);
         void processAddrMsg(struct nlmsghdr* nlh);
         void processLinkMsg(struct nlmsghdr* nlh);
         void processRouteMsg(struct nlmsghdr* nlh);
