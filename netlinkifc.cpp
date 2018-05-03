@@ -562,6 +562,9 @@ void NetLinkIfc::processRouteMsg(struct nlmsghdr* nlh)
 {
    std::lock_guard<std::recursive_mutex> guard(g_state_mutex);
    struct rtmsg *rtmp = (struct rtmsg *)nlmsg_data(nlh);
+   bool dflt_route = false;
+   bool route_add = false;
+   bool dst_addr = false;
 
    struct nlattr *attrs[RTA_MAX];
    for (int i =0;i<RTA_MAX;++i)
@@ -579,10 +582,12 @@ void NetLinkIfc::processRouteMsg(struct nlmsghdr* nlh)
    if ((nlh->nlmsg_type == RTM_NEWROUTE) && (rtmp->rtm_family == AF_INET6))
    {
       event = eNETIFC_EVENT_ADD_IP6ROUTE;
+      route_add = true;
    }
    if ((nlh->nlmsg_type == RTM_NEWROUTE) && (rtmp->rtm_family == AF_INET))
    {
       event = eNETIFC_EVENT_ADD_IPROUTE;
+      route_add = true;
    }
    if ((nlh->nlmsg_type == RTM_DELROUTE) && (rtmp->rtm_family == AF_INET6))
    {
@@ -609,6 +614,7 @@ void NetLinkIfc::processRouteMsg(struct nlmsghdr* nlh)
    inet_ntop(rtmp->rtm_family,nla_data(attrs[RTA_DST]),addrStr,1024);
    msgargs += ";DST=";
    msgargs += addrStr;
+   dst_addr = true;
    }
 
    if (attrs[RTA_GATEWAY] != NULL)
@@ -616,6 +622,7 @@ void NetLinkIfc::processRouteMsg(struct nlmsghdr* nlh)
    inet_ntop(rtmp->rtm_family,nla_data(attrs[RTA_GATEWAY]),addrStr,1024);
    msgargs += ";GATEWAY=";
    msgargs += addrStr;
+   dflt_route = true;
    }
 
    if (attrs[RTA_IIF] != NULL)
@@ -628,6 +635,12 @@ void NetLinkIfc::processRouteMsg(struct nlmsghdr* nlh)
    msgargs += ";OUTPUT IF = ";
    msgargs += m_interfaceMap[*(int*)nla_data(attrs[RTA_OIF])];
    }
+
+   if ( dflt_route && route_add && !dst_addr )
+   {
+       publish(NlType::dfltroute,msgargs);
+   }
+
    runStateMachine(event,msgargs);
 }
 int NetLinkIfc::receiveNewMsg(struct nl_msg *msg, void *arg)

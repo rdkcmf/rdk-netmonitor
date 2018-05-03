@@ -25,7 +25,8 @@ map<string,NlType> type_map =
    {"address",NlType::address},
    {"link", NlType::link},
    {"route",NlType::route},
-   {"wifi",NlType::wifi}
+   {"wifi",NlType::wifi},
+   {"dfltroute",NlType::dfltroute}
 };
 
 int main ()

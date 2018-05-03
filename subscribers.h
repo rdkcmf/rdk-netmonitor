@@ -22,7 +22,7 @@
 #include <string>
 #include <iostream>
 #include <algorithm>
-enum class NlType { address, link, route, wifi, unknown };
+enum class NlType { address, link, route, wifi, dfltroute, unknown };
 class Subscriber
 {
 protected:
