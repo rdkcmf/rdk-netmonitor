@@ -158,8 +158,7 @@ public:
         void deleteinterfaceip(string ifc, unsigned int family);
         void deleteinterfaceroutes(string ifc, unsigned int family);
         void activatelink(string ifc);
-
-        bool getIpaddr(string ifc,unsigned int family,string& ipaddr);
+        bool getIpaddr(string ifc,unsigned int family,vector<string>& ipaddr);
 
         inline void addSubscriber(Subscriber* s){ m_subscribers.push_back(s); }
         inline void deleteSubscriber(Subscriber* s)
@@ -178,6 +177,7 @@ extern "C" {
 void delete_addr_cb(struct nl_object *obj, void *arg);
 void delete_route_cb(struct nl_object *obj, void *arg);
 void modify_link_cb(struct nl_object *obj, void *arg);
+void get_ip_addr_cb(struct nl_object *obj, void *arg);
 }
 
 #endif// _NETLINKIFC_H_
