@@ -817,39 +817,74 @@ void modify_link_cb(struct nl_object *obj, void *arg)
    }
 }
 
-bool NetLinkIfc::getIpaddr(string ifc,unsigned int family,string& ipaddr)
+bool NetLinkIfc::getIpaddr(string ifc,unsigned int family,vector<string>& ipaddr)
 {
-   bool retCode = false;
-   int ifindex = -1;
-
-   std::lock_guard<std::recursive_mutex> guard(g_state_mutex);
-   //1. find index for the ifcname
-   for (auto const& i : m_interfaceMap)
-   {
-      if (i.second == ifc)
-      {
-         ifindex = i.first;
-         break;
-      }
-   }
-
-  //2. Use the index to find out ipadress requested
-   std::pair <std::multimap<int,struct ipaddr>::iterator, std::multimap<int,struct ipaddr>::iterator> ret = m_ipAddrMap.equal_range(ifindex);
-   for (multimap<int,struct ipaddr>::iterator iter = ret.first;iter != ret.second;++iter)
-   {
-      if ((iter->second.family  == family) && (iter->second.global))
-      {
-         retCode = true;
-         ipaddr = iter->second.address;
-      }
-   }
-
-   if (!retCode)
-   {
-#ifdef _DEBUG_
-      cout<<"Interface Name = "<<ifc<<" is not found"<<endl;
-#endif
-   }
-
-   return retCode;
+    int ifindex = 0;
+    if (ifc.empty())
+    {
+        cout<<"NetLinkIfc::getIpaddr : no interface name"<<endl;
+        return false;
+    }
+    else
+    {
+        cout <<" Interface "<<ifc<<endl;
+    }
+    if((family != AF_INET) && (family != AF_INET6))
+    {
+        cout<<"NetLinkIfc::getIpaddr : wrong address family "<< family <<endl;
+        return false;
+    }
+    nl_cache_refill(m_clisocketId,m_link_cache);
+    nl_cache_refill(m_clisocketId,m_addr_cache);
+    if (!(ifindex = rtnl_link_name2i(m_link_cache, ifc.c_str())))
+    {
+        cout <<ENOENT<<" Link "<<ifc<<" does not exist"<<endl;
+        return false;
+    }
+    else
+    {
+        cout <<"interface index is" <<ifindex <<endl;
+    }
+    struct rtnl_addr *rtnlAddr = nl_cli_addr_alloc();
+    if(!rtnlAddr)
+    {
+        cout<<"NetLinkIfc::getIpaddr : rtnl_addr NULL " <<endl;
+        return false;
+    }
+    rtnl_addr_set_ifindex(rtnlAddr, ifindex);
+    rtnl_addr_set_family(rtnlAddr, family);
+    rtnl_addr_set_scope(rtnlAddr, 0);
+    nl_cache_foreach_filter(m_addr_cache, (struct nl_object *) rtnlAddr,get_ip_addr_cb, (void *)&ipaddr);
+    if (rtnlAddr)
+        rtnl_addr_put(rtnlAddr);
+    return true;
+}
+void get_ip_addr_cb(struct nl_object *obj, void *arg)
+{
+    char *ipBuffer;
+    ipBuffer=(char*)malloc(sizeof(char) * INET6_ADDRSTRLEN);
+    if(ipBuffer)
+    {
+        vector<string> *ptrIpAddr = static_cast<vector<string>*>(arg);
+        struct nl_addr *addr = rtnl_addr_get_local((struct rtnl_addr *) obj);
+        if (NULL == addr)
+        {
+            cout<<"NetLinkIfc::getIpaddr :failed to get rtnl local address"<<endl;
+        }
+        ipBuffer = nl_addr2str(addr,ipBuffer,INET6_ADDRSTRLEN);
+        if (NULL == ipBuffer)
+        {
+            cout<<"NetLinkIfc::getIpaddr :failed in nl_addr2str"<<endl;
+        }
+        else
+        {
+            ptrIpAddr->push_back(ipBuffer);
+            cout << "ip address is "<<ipBuffer<<endl;
+        }
+        free(ipBuffer);
+    }
+    else
+    {
+        cout << "NetLinkIfc:get_ip_addr_cb Malloc Allocation error "<<endl;
+    }
 }
