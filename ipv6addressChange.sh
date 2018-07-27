@@ -51,7 +51,7 @@ fi
 
 echo "Recived address Notificatio, cmd = $cmd, mode = $mode,  $IFC= $ifc, addr = $addr, flags = $flags"
 
-if [ $ifc == $WIFI_INTERFACE ] || [ $ifc == $MOCA_INTERFACE ] || [ $ifc == $LAN_INTERFACE ]; then
+if [ $ifc == "$WIFI_INTERFACE" ] || [ $ifc == "$MOCA_INTERFACE" ] || [ $ifc == "$LAN_INTERFACE" ] || [ $ifc == "${WIFI_INTERFACE}:0" ] || [ $ifc == "$[MOCA_INTERFACE]:0" ] || [ $ifc == "$[LAN_INTERFACE]:0" ]; then
 
    if [ "x$cmd" == "xadd" ] && [ "x$flags" == "xglobal" ]; then
      $IPTABLE_CMD -I INPUT -s $addr -p tcp --dport 22 -j ACCEPT
