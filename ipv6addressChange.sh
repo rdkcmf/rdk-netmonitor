@@ -42,16 +42,20 @@ if [ "x$cmd" == "xadd" ] && [ "x$flags" == "xglobal" ]; then
    fi
    if [ $mode == "ipv6" ]; then
      touch /tmp/estb_ipv6
+     touch /tmp/addressaquired_ipv6
    else
      touch /tmp/estb_ipv4
+     touch /tmp/addressaquired_ipv4
   fi
 fi
 
 if [ "x$cmd" == "xdelete" ] && [ "x$flags" == "xglobal" ]; then
    if [ $mode == "ipv6" ]; then
      rm -f  /tmp/estb_ipv6
+     rm -f /tmp/addressaquired_ipv6
    else
      rm -f /tmp/estb_ipv4
+     rm -f /tmp/addressaquired_ipv4
   fi
 fi
 
