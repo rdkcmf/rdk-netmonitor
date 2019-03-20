@@ -20,4 +20,20 @@
 ## invocation format
 ## add ipv4 interfacename address global
 
+. /etc/device.properties
+cmd=$1
+mode=$2
+ifc=$3
+addr=$4
+flags=$5
+
+filename="/tmp/addressaquired_ipv4"
+if [ "x$mode" = "xipv6" ]; then
+   filename="/tmp/addressaquired_ipv6"
+fi
 echo "Address Info from Kernel: $*"
+if [ "x$cmd" = "xadd" ] && [ "x$flags" = "xglobal" ]; then
+	if [ "x$ifc" = "x$DEFAULT_ESTB_INTERFACE" ] && [ "x$addr" != "x$DEFAULT_ESTB_IP" ] && [ "x$addr" != "x$DEFAULT_ECM_IP" ]; then
+		touch $filename
+	fi
+fi
