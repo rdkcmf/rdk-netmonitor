@@ -35,5 +35,8 @@ echo "Address Info from Kernel: $*"
 if [ "x$cmd" = "xadd" ] && [ "x$flags" = "xglobal" ]; then
 	if [ "x$ifc" = "x$DEFAULT_ESTB_INTERFACE" ] && [ "x$addr" != "x$DEFAULT_ESTB_IP" ] && [ "x$addr" != "x$DEFAULT_ECM_IP" ]; then
 		touch $filename
+        if [ -f /lib/rdk/getDeviceDetails.sh ]; then
+            /bin/sh /lib/rdk/getDeviceDetails.sh refresh estb_ip &
+        fi
 	fi
 fi
