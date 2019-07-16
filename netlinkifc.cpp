@@ -253,6 +253,12 @@ void NetLinkIfc::addipaddr(string str)
    std::lock_guard<std::recursive_mutex> guard(g_state_mutex);
    vector<string> tokens;
    tokenize(str,tokens);
+
+   if (tokens.size() < 3)
+   {
+	   cout<<"ADD IPV4 ADRESS: Ignoring Message due to Improper formatting. Incoming string: "<<str.c_str()<<endl;
+	   return;
+   }
 #ifdef _DEBUG_
    cout<<"ADD IPV4 ADRESS ;INTERFACE NAME = "<<tokens[0]<<"   address="<<tokens[1]<<" FLAGS = "<<tokens[2]<<endl;
 #endif
@@ -268,6 +274,12 @@ void NetLinkIfc::deleteipaddr(string str)
    std::lock_guard<std::recursive_mutex> guard(g_state_mutex);
    vector<string> tokens;
    tokenize(str,tokens);
+
+   if (tokens.size() < 3)
+   {
+	   cout<<"DELETE IPV4 ADRESS: Ignoring Message due to Improper formatting. Incoming string: "<<str.c_str()<<endl;
+	   return;
+   }
 #ifdef _DEBUG_
    cout<<"DELETE IPV4 ADRESS ;INTERFACE NAME = "<<tokens[0]<<"   address="<<tokens[1]<<" FLAGS = "<<tokens[2]<<endl;
 #endif
@@ -284,6 +296,12 @@ void NetLinkIfc::addip6addr(string str )
    std::lock_guard<std::recursive_mutex> guard(g_state_mutex);
    vector<string> tokens;
    tokenize(str,tokens);
+
+   if (tokens.size() < 3)
+   {
+	   cout<<"ADD IPV6 ADRESS: Ignoring Message due to Improper formatting. Incoming string: "<<str.c_str()<<endl;
+	   return;
+   }
 #ifdef _DEBUG_
    cout<<"ADD IPV6 ADRESS ;INTERFACE NAME = "<<tokens[0]<<"   address="<<tokens[1]<<" FLAGS = "<<tokens[2]<<endl;
 #endif
@@ -300,6 +318,12 @@ void NetLinkIfc::deleteip6addr(string str)
    std::lock_guard<std::recursive_mutex> guard(g_state_mutex);
    vector<string> tokens;
    tokenize(str,tokens);
+
+   if (tokens.size() < 3)
+   {
+	   cout<<"DELETE IPV6 ADRESS: Ignoring Message due to Improper formatting. Incoming string: "<<str.c_str()<<endl;
+	   return;
+   }
 #ifdef _DEBUG_
    cout<<"DELETE IPV6 ADRESS ;INTERFACE NAME = "<<tokens[0]<<"   address="<<tokens[1]<<" FLAGS = "<<tokens[2]<<endl;
 #endif
