@@ -88,6 +88,11 @@ NetLinkIfc::NetLinkIfc ():m_socketId(NULL),m_state(eNETIFC_STATE_INIT),m_event(e
 
 NetLinkIfc::~NetLinkIfc()
 {
+    nl_socket_free(m_socketId);
+    nl_socket_free(m_clisocketId);
+    nl_cache_put(m_link_cache);
+    nl_cache_put(m_route_cache);
+    nl_cache_put(m_addr_cache);
 }
 
 void NetLinkIfc::initialize()
@@ -490,7 +495,7 @@ void NetLinkIfc::processLinkMsg(struct nlmsghdr* nlh)
 #ifdef _DEBUG_
          cout<<"DELETING INTERFACE: IF INDEX = "<<iface->ifi_index<<" ; INTERFACE NAME = "<<m_interfaceMap[iface->ifi_index]<<endl;
 #endif
-            char addrStr[32];
+            char addrStr[32] = {0};
             if (inet_pton(AF_INET,iter->second.address.c_str(),addrStr))
             {
                runStateMachine(eNETIFC_EVENT_DELETE_IPADDR,msgArgs);
@@ -626,42 +631,83 @@ void NetLinkIfc::processRouteMsg(struct nlmsghdr* nlh)
       event = eNETIFC_EVENT_DELETE_IPROUTE;
    }
 
+   //Message Args format: family;output interface;destination address;gatewayip;srcip;priority
    string msgargs = "";
-
-   char addrStr[1024];
-   if (attrs[RTA_SRC] != NULL)
+   if (attrs[RTA_OIF]  == NULL ) 
    {
-      inet_ntop(rtmp->rtm_family,nla_data(attrs[RTA_SRC]),addrStr,1024);
-      msgargs += "SRC=" ;
-      msgargs += addrStr;
+      cout<<"Output interface is  missing. This is absolutely needed for post processing"<<endl;
+      return;
+
    }
 
+   msgargs += std::to_string(rtmp->rtm_family);
+   if (attrs[RTA_OIF] != NULL)
+   {
+      msgargs += "; ";
+      msgargs += m_interfaceMap[*(int*)nla_data(attrs[RTA_OIF])];
+   }
 
+   char addrStr[1024] = {0};
    if (attrs[RTA_DST] != NULL)
    {
-   inet_ntop(rtmp->rtm_family,nla_data(attrs[RTA_DST]),addrStr,1024);
-   msgargs += ";DST=";
-   msgargs += addrStr;
-   dst_addr = true;
+      inet_ntop(rtmp->rtm_family,nla_data(attrs[RTA_DST]),addrStr,1024);
+      msgargs += "; " ; 
+      msgargs += addrStr;
+      dst_addr = true;
+   }
+   else
+   {
+      msgargs += "; " ; 
+      if (event == eNETIFC_EVENT_ADD_IP6ROUTE)
+      {
+         msgargs += "::/0";
+      }
+      else
+      {
+         msgargs += "0.0.0.0";
+      }
    }
 
    if (attrs[RTA_GATEWAY] != NULL)
    {
-   inet_ntop(rtmp->rtm_family,nla_data(attrs[RTA_GATEWAY]),addrStr,1024);
-   msgargs += ";GATEWAY=";
-   msgargs += addrStr;
-   dflt_route = true;
+      inet_ntop(rtmp->rtm_family,nla_data(attrs[RTA_GATEWAY]),addrStr,1024);
+      msgargs += "; "; 
+      msgargs += addrStr;
+      dflt_route = true;
+   }
+   else
+   {
+      msgargs += "; NA";
    }
 
-   if (attrs[RTA_IIF] != NULL)
+   if (attrs[RTA_SRC] != NULL)
    {
-      msgargs += ";INPUT IF = ";
-      msgargs += m_interfaceMap[*(int*)nla_data(attrs[RTA_IIF])];
+      inet_ntop(rtmp->rtm_family,nla_data(attrs[RTA_SRC]),addrStr,1024);
+      cout<<"SRC ADDRESS REECEIVED. This is Unusual. Received Address: "<<addrStr<<endl;
    }
-   if (attrs[RTA_OIF] != NULL)
+   if (attrs[RTA_PREFSRC] != NULL)
    {
-   msgargs += ";OUTPUT IF = ";
-   msgargs += m_interfaceMap[*(int*)nla_data(attrs[RTA_OIF])];
+      inet_ntop(rtmp->rtm_family,nla_data(attrs[RTA_PREFSRC]),addrStr,1024);
+      if (!dflt_route)
+      {
+         msgargs += "; NA";
+      }
+      msgargs += "; " ; 
+      msgargs += addrStr;
+   }
+   else
+   {
+      msgargs += "; NA";
+   }
+
+   if (attrs[RTA_PRIORITY] != NULL )
+   {
+      msgargs += "; ";
+      msgargs += std::to_string(*(int*)nla_data(attrs[RTA_PRIORITY]));
+   }
+   else
+   {
+      msgargs += "; NA";
    }
 
    if ( dflt_route && route_add && !dst_addr )
@@ -734,6 +780,7 @@ void NetLinkIfc::deleteinterfaceip(string ifc, unsigned int family)
   //3. Set scope to Global
   rtnl_addr_set_scope(addr, 0);
   nl_cache_foreach_filter(m_addr_cache, ((struct nl_object *) (addr)), delete_addr_cb, m_clisocketId);
+  rtnl_addr_put(addr);
 }
 
 void delete_addr_cb(struct nl_object *obj, void *arg)
@@ -751,6 +798,153 @@ void delete_addr_cb(struct nl_object *obj, void *arg)
    }
 }
 
+bool NetLinkIfc::userdefinedrouteexists(string ifc, string gateway,unsigned int family)
+{
+   bool retCode = false;
+   std::lock_guard<std::recursive_mutex> guard(g_state_mutex);
+   struct rtnl_route *route = nl_cli_route_alloc();
+
+   nl_cache_refill(m_clisocketId,m_link_cache);
+   nl_cache_refill(m_clisocketId,m_route_cache);
+
+   int ifindex = 0;
+
+   //1. populate index.
+   if (!(ifindex = rtnl_link_name2i(m_link_cache, ifc.c_str())))
+   {
+      cout <<ENOENT<<" Link "<<ifc<<" does not exist"<<endl;
+      return retCode;
+   }
+
+   //2. Set the Family
+   rtnl_route_set_family(route, family);
+
+   struct rtnl_nexthop *nh = rtnl_route_nh_alloc();
+   rtnl_route_nh_set_ifindex(nh,ifindex);
+
+   struct nl_addr * gwAddr = NULL; 
+   if (!nl_addr_parse(gateway.c_str(),family,&gwAddr))
+   {
+      rtnl_route_nh_set_gateway(nh,gwAddr);
+   }
+   rtnl_route_add_nexthop(route, nh);
+
+   nlargs routeArgs;
+   routeArgs.socketId = NULL;
+   routeArgs.linkInfo = &retCode;
+   nl_cache_foreach_filter(m_route_cache, (struct nl_object *)route, update_user_route_present, &routeArgs);
+   rtnl_route_put(route);
+   nl_addr_put(gwAddr);
+   return retCode;
+}
+bool NetLinkIfc::routeexists(string ifc, string gateway,unsigned int family,unsigned int priority)
+{
+   bool retCode = false;
+   std::lock_guard<std::recursive_mutex> guard(g_state_mutex);
+   struct rtnl_route *route;
+
+   route = nl_cli_route_alloc();
+   nl_cache_refill(m_clisocketId,m_link_cache);
+   nl_cache_refill(m_clisocketId,m_route_cache);
+
+   int ifindex = 0;
+
+   //1. populate index.
+   if (!(ifindex = rtnl_link_name2i(m_link_cache, ifc.c_str())))
+   {
+      cout <<ENOENT<<" Link "<<ifc<<" does not exist"<<endl;
+      return retCode;
+   }
+
+   //2. Set the Family
+   rtnl_route_set_family(route, family);
+
+   //3. Set priority.
+   rtnl_route_set_priority(route,priority);
+
+   //4. Set the device.
+   struct rtnl_nexthop *nh = rtnl_route_nh_alloc();
+   rtnl_route_nh_set_ifindex(nh,ifindex);
+   rtnl_route_add_nexthop(route, nh);
+
+   nlargs routeArgs;
+   routeArgs.socketId = NULL;
+   routeArgs.linkInfo = &retCode;
+
+   nl_cache_foreach_filter(m_route_cache, (struct nl_object *)route, update_route_present, &routeArgs);
+   rtnl_route_put(route);
+   return retCode;
+}
+void NetLinkIfc::changedefaultroutepriority(string ifc, string gateway,unsigned int family,unsigned int priority,unsigned int setpriority)
+{
+   std::lock_guard<std::recursive_mutex> guard(g_state_mutex);
+   struct rtnl_route *route;
+   int nf = 0;
+
+   route = nl_cli_route_alloc();
+   nl_cache_refill(m_clisocketId,m_link_cache);
+   nl_cache_refill(m_clisocketId,m_route_cache);
+
+   int ifindex = 0;
+   cout <<"Entered Function: "<<__FUNCTION__<<", line number: "<<__LINE__<<endl;
+
+   //1. populate index.
+   if (!(ifindex = rtnl_link_name2i(m_link_cache, ifc.c_str())))
+   {
+      cout <<ENOENT<<" Link "<<ifc<<" does not exist"<<endl;
+      return;
+   }
+
+   //2. Set the Family
+   rtnl_route_set_family(route, family);
+
+   //3. Set priority.
+   rtnl_route_set_priority(route,priority);
+
+   //4. Set the device.
+   struct rtnl_nexthop *nh = rtnl_route_nh_alloc();
+   rtnl_route_nh_set_ifindex(nh,ifindex);
+   struct nl_addr * gwAddr = NULL; 
+   if (!nl_addr_parse(gateway.c_str(),family,&gwAddr))
+   {
+      rtnl_route_nh_set_gateway(nh,gwAddr);
+   }
+   rtnl_route_add_nexthop(route, nh);
+
+   nlargs routeArgs;
+   routeArgs.socketId = m_clisocketId;
+   routeArgs.linkInfo = &setpriority;
+
+   if (routeexists(ifc, gateway,family,priority))
+   {
+      nl_cache_foreach_filter(m_route_cache, (struct nl_object *)route, modify_route_cb, &routeArgs);
+   }
+   else
+   {
+      cout<<"Default route is not visible, but invoked to change priority. Adding default route with gateway : "
+	  <<gateway.c_str()
+	  <<", changing priority to: " 
+	  <<setpriority<<endl;
+
+      rtnl_route_set_priority(route,setpriority);
+      struct nl_addr * dstAddr = NULL; 
+      string addrStr = "::/0";
+      if (family == AF_INET)
+      {
+         addrStr = "0.0.0.0";
+      }
+      nl_addr_parse(addrStr.c_str(),family,&dstAddr);
+      rtnl_route_set_dst(route,dstAddr);
+      int err = rtnl_route_add(m_clisocketId,route,0);
+      if (err < 0)
+      {
+         cout <<"Unable to add route: "<<nl_geterror(err)<<endl;
+      }
+      nl_addr_put(dstAddr);
+   }
+   rtnl_route_put(route);
+   nl_addr_put(gwAddr);
+}
 void NetLinkIfc::deleteinterfaceroutes(string ifc, unsigned int family)
 {
    std::lock_guard<std::recursive_mutex> guard(g_state_mutex);
@@ -782,7 +976,51 @@ void NetLinkIfc::deleteinterfaceroutes(string ifc, unsigned int family)
    rtnl_route_add_nexthop(route, nh);
 
    nl_cache_foreach_filter(m_route_cache, (struct nl_object *)route, delete_route_cb, m_clisocketId);
+   rtnl_route_put(route);
 }
+
+void modify_route_cb(struct nl_object *obj, void *arg)
+{
+   cout<<"ENTERED MODIFY ROUTE CB"<<endl;
+   struct rtnl_route *route = (struct rtnl_route*)nl_object_priv(obj);
+   nlargs* pargs = (nlargs*) arg;
+   int err = rtnl_route_delete((struct nl_sock *)pargs->socketId, route, 0);
+   if (err < 0)
+   {
+      cout <<"Unable to delete route: "<<nl_geterror(err)<<endl;
+   }
+   rtnl_route_set_priority(route,*(unsigned int*)pargs->linkInfo);
+   err = rtnl_route_add((struct nl_sock *)pargs->socketId, route, 0);
+   if (err < 0)
+   {
+      cout <<"Unable to add route: "<<nl_geterror(err)<<endl;
+   }
+}
+void update_route_present(struct nl_object *obj, void *arg)
+{
+   cout<<"ENTERED ROUTE PRESENT CB"<<endl;
+   nlargs* pargs = (nlargs*) arg;
+   if (pargs->linkInfo != NULL)
+   {
+      *(bool*)pargs->linkInfo = true;
+   }
+}
+void update_user_route_present(struct nl_object *obj, void *arg)
+{
+   cout<<"ENTERED USER ROUTE PRESENT CB"<<endl;
+
+   const int cDEFAULT_PRIORITY = 1024;
+   struct rtnl_route *route = (struct rtnl_route*)nl_object_priv(obj);
+   if (rtnl_route_get_priority(route) != cDEFAULT_PRIORITY )
+   {
+      nlargs* pargs = (nlargs*) arg;
+      if (pargs->linkInfo != NULL)
+      {
+         *(bool*)pargs->linkInfo = true;
+      }
+   }
+}
+
 
 void delete_route_cb(struct nl_object *obj, void *arg)
 {
@@ -819,16 +1057,19 @@ void NetLinkIfc::activatelink(string ifc)
    nl_cli_link_parse_name(link,(char*)ifc.c_str());
    rtnl_link_set_flags(up, IFF_UP);
    rtnl_link_unset_flags(down, IFF_UP);
-   linkargs linkArg;
+   nlargs linkArg;
    linkArg.socketId = m_clisocketId;
    linkArg.linkInfo = down;
    nl_cache_foreach_filter(m_link_cache, OBJ_CAST(link), modify_link_cb, &linkArg);
    linkArg.linkInfo = up;
    nl_cache_foreach_filter(m_link_cache, OBJ_CAST(link), modify_link_cb, &linkArg);
+   rtnl_link_put(link);
+   rtnl_link_put(up);
+   rtnl_link_put(down);
 }
 void modify_link_cb(struct nl_object *obj, void *arg)
 {
-   linkargs* linkArg = (linkargs*) arg;
+   nlargs* linkArg = (nlargs*) arg;
    struct rtnl_link *link = (struct rtnl_link*)nl_object_priv(obj);
    int err;
    if ((err = rtnl_link_change(linkArg->socketId, link, (struct rtnl_link *)linkArg->linkInfo, 0)) < 0)

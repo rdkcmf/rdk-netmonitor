@@ -23,6 +23,8 @@
 #include <iostream>
 #include <algorithm>
 enum class NlType { address, link, route, wifi, dfltroute, unknown };
+
+using namespace std;
 class Subscriber
 {
 protected:
@@ -67,6 +69,8 @@ public:
   void invoke(std::string args)
   {
       std::cout<<"ARGS  = "<<args<<std::endl;
+      args.erase(std::remove_if(args.begin(),args.end(),[](char c) {
+          return !(isalnum(c) || (c == '/') || (c == ' ') || (c == ':') || (c == '-') || (c == '.') || (c == '@') || (c == '_') || (c == '[') || (c == ']'));}),args.end());
       m_funcPtr(args);
   }
 };
