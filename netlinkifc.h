@@ -91,12 +91,12 @@ typedef struct ipaddr
    }
 } ipaddr;
 
-typedef struct linkargs
+typedef struct nlargs
 {
    struct nl_sock* socketId;
    void* linkInfo;
-} linkargs;
-    
+} nlargs;
+
    
 
 class NetLinkIfc
@@ -158,6 +158,9 @@ public:
         void deleteinterfaceip(string ifc, unsigned int family);
         void deleteinterfaceroutes(string ifc, unsigned int family);
         void activatelink(string ifc);
+	void changedefaultroutepriority(string ifc, string gateway,unsigned int family,unsigned int priority,unsigned int setpriority);
+	bool routeexists(string ifc, string gateway,unsigned int family,unsigned int priority);
+	bool userdefinedrouteexists(string ifc, string gateway,unsigned int family);
         bool getIpaddr(string ifc,unsigned int family,vector<string>& ipaddr);
 
         inline void addSubscriber(Subscriber* s){ m_subscribers.push_back(s); }
@@ -178,6 +181,9 @@ void delete_addr_cb(struct nl_object *obj, void *arg);
 void delete_route_cb(struct nl_object *obj, void *arg);
 void modify_link_cb(struct nl_object *obj, void *arg);
 void get_ip_addr_cb(struct nl_object *obj, void *arg);
+void modify_route_cb(struct nl_object *obj, void *arg);
+void update_route_present(struct nl_object *obj, void *arg);
+void update_user_route_present(struct nl_object *obj, void *arg);
 }
 
 #endif// _NETLINKIFC_H_
