@@ -59,11 +59,16 @@ if [ "x$cmd" == "xdelete" ] && [ "x$flags" == "xglobal" ]; then
   fi
 fi
 
-echo "Recived address Notificatio, cmd = $cmd, mode = $mode,  $IFC= $ifc, addr = $addr, flags = $flags"
+echo "Received address Notificatio, cmd = $cmd, mode = $mode,  $IFC= $ifc, addr = $addr, flags = $flags"
+
+uptime=`cat /proc/uptime | awk '{print $1}'`
 
 if [ $ifc == "$WIFI_INTERFACE" ] || [ $ifc == "$MOCA_INTERFACE" ] || [ $ifc == "$LAN_INTERFACE" ] || [ $ifc == "${WIFI_INTERFACE}:0" ] || [ $ifc == "${MOCA_INTERFACE}:0" ] || [ $ifc == "${LAN_INTERFACE}:0" ]; then
 
    if [ "x$cmd" == "xadd" ] && [ "x$flags" == "xglobal" ]; then
+     # Check for ESTB_INTERFACE from device.properties is matching with IP acquired interface.
+     echo "Received global $mode address for $ifc interface, uptime is $uptime seconds"
+
      $IPTABLE_CMD -I INPUT -s $addr -p tcp --dport 22 -j ACCEPT
      $IPTABLE_CMD -I OUTPUT -o lo -p tcp -s $addr -d $addr -j ACCEPT
      tr69agent_startup_script_pid=`ps -ef | grep '\/usr\/bin\/start.sh' | tr -s " " | cut -d ' ' -f2`
