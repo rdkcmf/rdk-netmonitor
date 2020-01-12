@@ -557,6 +557,16 @@ void NetLinkIfc::processAddrMsg(struct nlmsghdr* nlh)
    cout<<"LABEL = "<<ifname<<endl;
 #endif
 
+   if (ifname.empty())
+   {
+      char iName[100];
+      nl_cache_refill(m_clisocketId,m_link_cache);
+      if (rtnl_link_i2name(m_link_cache,ifindex,iName,sizeof(iName)) != NULL)
+      {
+         ifname = iName;
+      }
+   }
+
    string msgargs = ifname + ";" + addrStr + ";" + (addr.global ? "global":"local");
    if ((nlh->nlmsg_type == RTM_NEWADDR) && (rtmp->ifa_family == AF_INET6))
    {
