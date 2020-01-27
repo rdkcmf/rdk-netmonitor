@@ -67,7 +67,7 @@ if [ $ifc == "$WIFI_INTERFACE" ] || [ $ifc == "$MOCA_INTERFACE" ] || [ $ifc == "
 
    if [ "x$cmd" == "xadd" ] && [ "x$flags" == "xglobal" ]; then
      # Check for ESTB_INTERFACE from device.properties is matching with IP acquired interface.
-     echo "Received global $mode address for $ifc interface, uptime is $uptime seconds"
+     echo "Received global $mode address for $ifc interface, uptime is $uptime milliseconds"
 
      $IPTABLE_CMD -I INPUT -s $addr -p tcp --dport 22 -j ACCEPT
      $IPTABLE_CMD -I OUTPUT -o lo -p tcp -s $addr -d $addr -j ACCEPT
