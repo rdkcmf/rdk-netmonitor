@@ -18,8 +18,8 @@
 ##########################################################################
 [Unit]
 Description=Network Monitor Service.
-After=network-online.target var-lib.mount
-Requires=network-online.target var-lib.mount
+After=network-online.target
+Requires=network-online.target
 
 [Service]
 Type=forking
