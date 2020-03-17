@@ -511,6 +511,7 @@ void NetLinkIfc::processLinkMsg(struct nlmsghdr* nlh)
    }
 }
 
+
 void NetLinkIfc::processAddrMsg(struct nlmsghdr* nlh)
 {
    //1. convert to event.
@@ -924,6 +925,7 @@ void NetLinkIfc::changedefaultroutepriority(string ifc, string gateway,unsigned 
    nlargs routeArgs;
    routeArgs.socketId = m_clisocketId;
    routeArgs.linkInfo = &setpriority;
+   routeArgs.ifaceName = ifc;
 
    if (routeexists(ifc, gateway,family,priority))
    {
@@ -989,6 +991,15 @@ void NetLinkIfc::deleteinterfaceroutes(string ifc, unsigned int family)
    rtnl_route_put(route);
 }
 
+static void force_del_default_route(string ifaceName) {
+
+    cout << "Inside force_del_default_route for interface " << ifaceName.c_str() << endl;
+    std::string cmd = "/sbin/ip -6 route del default dev " + ifaceName;
+    cout << "Switching to fallback route delete with ip commands" << endl;
+    cout << "Exec command: " << cmd.c_str() << endl;
+    system(cmd.c_str());
+}
+
 void modify_route_cb(struct nl_object *obj, void *arg)
 {
    cout<<"ENTERED MODIFY ROUTE CB"<<endl;
@@ -998,6 +1009,7 @@ void modify_route_cb(struct nl_object *obj, void *arg)
    if (err < 0)
    {
       cout <<"Unable to delete route: "<<nl_geterror(err)<<endl;
+      force_del_default_route(pargs->ifaceName);
    }
    rtnl_route_set_priority(route,*(unsigned int*)pargs->linkInfo);
    err = rtnl_route_add((struct nl_sock *)pargs->socketId, route, 0);
@@ -1122,7 +1134,7 @@ bool NetLinkIfc::getIpaddr(string ifc,unsigned int family,vector<string>& ipaddr
     }
     else
     {
-        cout <<"interface index is" <<ifindex <<endl;
+        cout <<"interface index is " <<ifindex <<endl;
     }
     struct rtnl_addr *rtnlAddr = nl_cli_addr_alloc();
     if(!rtnlAddr)
