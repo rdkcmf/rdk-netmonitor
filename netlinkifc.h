@@ -95,6 +95,7 @@ typedef struct nlargs
 {
    struct nl_sock* socketId;
    void* linkInfo;
+   string ifaceName;
 } nlargs;
 
    
