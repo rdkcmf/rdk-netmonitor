@@ -28,6 +28,7 @@
 
 
 
+static void force_del_default_route(string ifaceName);
 
 NetLinkIfc* NetLinkIfc::pInstance = NULL;
 recursive_mutex NetLinkIfc::g_state_mutex;
@@ -894,7 +895,6 @@ void NetLinkIfc::changedefaultroutepriority(string ifc, string gateway,unsigned 
 
    route = nl_cli_route_alloc();
    nl_cache_refill(m_clisocketId,m_link_cache);
-   nl_cache_refill(m_clisocketId,m_route_cache);
 
    int ifindex = 0;
    cout <<"Entered Function: "<<__FUNCTION__<<", line number: "<<__LINE__<<endl;
@@ -926,6 +926,15 @@ void NetLinkIfc::changedefaultroutepriority(string ifc, string gateway,unsigned 
    routeArgs.socketId = m_clisocketId;
    routeArgs.linkInfo = &setpriority;
    routeArgs.ifaceName = ifc;
+
+   //We are deleting all the routes now.
+   //We will have to find an efficient way to clean up unneeded routes.
+   //The rules of the game:
+   //1. find out all the routes which doesnot match the current gateway ip.
+   //2. Delete all of them in a single go.(perhaps using some scoping rules).
+   //
+   force_del_default_route(ifc);
+   nl_cache_refill(m_clisocketId,m_route_cache);
 
    if (routeexists(ifc, gateway,family,priority))
    {
@@ -1005,14 +1014,10 @@ void modify_route_cb(struct nl_object *obj, void *arg)
    cout<<"ENTERED MODIFY ROUTE CB"<<endl;
    struct rtnl_route *route = (struct rtnl_route*)nl_object_priv(obj);
    nlargs* pargs = (nlargs*) arg;
-   int err = rtnl_route_delete((struct nl_sock *)pargs->socketId, route, 0);
-   if (err < 0)
-   {
-      cout <<"Unable to delete route: "<<nl_geterror(err)<<endl;
-      force_del_default_route(pargs->ifaceName);
-   }
+
+
    rtnl_route_set_priority(route,*(unsigned int*)pargs->linkInfo);
-   err = rtnl_route_add((struct nl_sock *)pargs->socketId, route, 0);
+   int err = rtnl_route_add((struct nl_sock *)pargs->socketId, route, 0);
    if (err < 0)
    {
       cout <<"Unable to add route: "<<nl_geterror(err)<<endl;
