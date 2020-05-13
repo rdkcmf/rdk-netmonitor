@@ -67,12 +67,22 @@ typedef enum
    eNETIFC_EVENT_ADD_IPROUTE,
    eNETIFC_EVENT_DELETE_IP6ROUTE,
    eNETIFC_EVENT_DELETE_IPROUTE,
+   eNETIFC_EVENT_LINK_ADMIN_UP,
+   eNETIFC_EVENT_LINK_ADMIN_DOWN,
    eNETIFC_EVENT_ADD_LINK,
    eNETIFC_EVENT_DELETE_LINK,
    eNETIFC_EVENT_REINITIALIZE,
    eNETIFC_EVENT_DONE,
    eNETIFC_EVENT_UNKNOWN = -1,
 } netifcEvent;
+
+typedef struct iface_info
+{
+    int          m_if_index;    // interface index
+    std::string  m_if_macaddr;  // mac address
+    unsigned int m_if_flags;    // SIOCGIFFLAGS
+    std::string  m_if_name;     // interface name
+} iface_info;
 
 typedef struct ipaddr
 {
@@ -83,13 +93,23 @@ typedef struct ipaddr
    
    bool operator ==(const ipaddr& rhs)
    {
-      if ((address == rhs.address) && (global == rhs.global) && (family == rhs.family) && (prefix == rhs.prefix))
-      {
-         return true;
-      }
-      return false;
+      return ((address == rhs.address) && (global == rhs.global) && (family == rhs.family) && (prefix == rhs.prefix));
    }
 } ipaddr;
+
+typedef struct default_route
+{
+    int interface_index;
+    std::string gateway;
+    unsigned int priority;
+
+    default_route() :
+        interface_index(-1),
+        gateway(""),
+        priority(UINT_MAX)
+    {
+    }
+} default_route;
 
 typedef struct nlargs
 {
@@ -109,7 +129,7 @@ private:
         netifcEvent m_event;
 
         map<int,string> m_interfaceMap;
-	multimap<int,ipaddr> m_ipAddrMap;
+        multimap<int,ipaddr> m_ipAddrMap;
         NetLinkIfc ();
         void populateinterfacecompleted(string);
         void populateaddrescompleted(string);
@@ -121,6 +141,9 @@ private:
         void addip6route(string);
         void deleteiproute(string);
         void deleteip6route(string);
+        void updateLinkState(string, bool);
+        void linkAdminUp(string);
+        void linkAdminDown(string);
         void addlink(string);
         void deletelink(string);
         void processAddrMsg(struct nlmsghdr* nlh);
@@ -138,7 +161,6 @@ private:
         static NetLinkIfc* pInstance;
         static void receiveMsg(NetLinkIfc* instance);
         static int receiveNewMsg(struct nl_msg *msg, void *arg);
-        
 
         // LIstening socket and its related addresses etc.
         struct nl_sock * m_socketId;
@@ -163,6 +185,8 @@ public:
 	bool routeexists(string ifc, string gateway,unsigned int family,unsigned int priority);
 	bool userdefinedrouteexists(string ifc, string gateway,unsigned int family);
         bool getIpaddr(string ifc,unsigned int family,vector<string>& ipaddr);
+        void getInterfaces(std::vector<iface_info> &interfaces);
+        bool getDefaultRoute(bool is_ipv6, string& interface, string& gateway);
 
         inline void addSubscriber(Subscriber* s){ m_subscribers.push_back(s); }
         inline void deleteSubscriber(Subscriber* s)
@@ -182,6 +206,8 @@ void delete_addr_cb(struct nl_object *obj, void *arg);
 void delete_route_cb(struct nl_object *obj, void *arg);
 void modify_link_cb(struct nl_object *obj, void *arg);
 void get_ip_addr_cb(struct nl_object *obj, void *arg);
+void get_interfaces_cb(struct nl_object *obj, void *arg);
+void get_default_route_cb(struct nl_object *obj, void *arg);
 void modify_route_cb(struct nl_object *obj, void *arg);
 void update_route_present(struct nl_object *obj, void *arg);
 void update_user_route_present(struct nl_object *obj, void *arg);

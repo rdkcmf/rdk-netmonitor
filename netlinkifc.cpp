@@ -25,8 +25,7 @@
 #include <string.h>
 #include <sys/types.h>
 #include <unistd.h>
-
-
+#include <linux/if_arp.h>
 
 static void force_del_default_route(string ifaceName);
 
@@ -100,11 +99,15 @@ void NetLinkIfc::initialize()
 {
     //Initialize state machine.
     std::lock_guard<std::recursive_mutex> guard(g_state_mutex);
+    stateMachine[eNETIFC_STATE_POPULATE_IFC][eNETIFC_EVENT_LINK_ADMIN_UP] = &NetLinkIfc::linkAdminUp;
+    stateMachine[eNETIFC_STATE_POPULATE_IFC][eNETIFC_EVENT_LINK_ADMIN_DOWN] = &NetLinkIfc::linkAdminDown;
     stateMachine[eNETIFC_STATE_POPULATE_IFC][eNETIFC_EVENT_ADD_LINK] = &NetLinkIfc::addlink;
     stateMachine[eNETIFC_STATE_POPULATE_IFC][eNETIFC_EVENT_DELETE_LINK] = &NetLinkIfc::deletelink;
     stateMachine[eNETIFC_STATE_POPULATE_IFC][eNETIFC_EVENT_ADD_IP6ADDR] = &NetLinkIfc::addip6addr;
     stateMachine[eNETIFC_STATE_POPULATE_IFC][eNETIFC_EVENT_ADD_IPADDR] = &NetLinkIfc::addipaddr;
     stateMachine[eNETIFC_STATE_POPULATE_IFC][eNETIFC_EVENT_DONE] = &NetLinkIfc::populateinterfacecompleted;
+    stateMachine[eNETIFC_STATE_POPULATE_ADDRESS][eNETIFC_EVENT_LINK_ADMIN_UP] = &NetLinkIfc::linkAdminUp;
+    stateMachine[eNETIFC_STATE_POPULATE_ADDRESS][eNETIFC_EVENT_LINK_ADMIN_DOWN] = &NetLinkIfc::linkAdminDown;
     stateMachine[eNETIFC_STATE_POPULATE_ADDRESS][eNETIFC_EVENT_ADD_LINK] = &NetLinkIfc::addlink;
     stateMachine[eNETIFC_STATE_POPULATE_ADDRESS][eNETIFC_EVENT_DELETE_LINK] = &NetLinkIfc::deletelink;
     stateMachine[eNETIFC_STATE_POPULATE_ADDRESS][eNETIFC_EVENT_ADD_IP6ADDR] = &NetLinkIfc::addip6addr;
@@ -118,6 +121,8 @@ void NetLinkIfc::initialize()
     stateMachine[eNETIFC_STATE_RUNNING][eNETIFC_EVENT_ADD_IPROUTE] = &NetLinkIfc::addiproute;
     stateMachine[eNETIFC_STATE_RUNNING][eNETIFC_EVENT_DELETE_IP6ROUTE] = &NetLinkIfc::deleteip6route;
     stateMachine[eNETIFC_STATE_RUNNING][eNETIFC_EVENT_DELETE_IPROUTE] = &NetLinkIfc::deleteiproute;
+    stateMachine[eNETIFC_STATE_RUNNING][eNETIFC_EVENT_LINK_ADMIN_UP] = &NetLinkIfc::linkAdminUp;
+    stateMachine[eNETIFC_STATE_RUNNING][eNETIFC_EVENT_LINK_ADMIN_DOWN] = &NetLinkIfc::linkAdminDown;
     stateMachine[eNETIFC_STATE_RUNNING][eNETIFC_EVENT_ADD_LINK] = &NetLinkIfc::addlink;
     stateMachine[eNETIFC_STATE_RUNNING][eNETIFC_EVENT_DELETE_LINK] = &NetLinkIfc::deletelink;
     //stateMachine[eNETIFC_STATE_RUNNING][eNETIFC_EVENT_REINITIALIZE] = &NetLinkIfc::reinitialize;
@@ -238,6 +243,27 @@ void NetLinkIfc::publish(NlType type,string args)
          i->invoke(args);
       }
    }
+}
+
+void NetLinkIfc::updateLinkState(string link, bool state)
+{
+    std::lock_guard<std::recursive_mutex> guard(g_state_mutex);
+    static std::map<std::string, bool> link_states;
+    auto it = link_states.find(link);
+    if (it == link_states.end() || it->second != state)
+    {
+        link_states[link] = state;
+        string msgArgs = link + (state ? " up" : " down");
+        publish(NlType::link, msgArgs);
+    }
+}
+void NetLinkIfc::linkAdminUp(string link)
+{
+    updateLinkState(link, true);
+}
+void NetLinkIfc::linkAdminDown(string link)
+{
+    updateLinkState(link, false);
 }
 
 void NetLinkIfc::addlink(string str)
@@ -477,6 +503,8 @@ void NetLinkIfc::processLinkMsg(struct nlmsghdr* nlh)
          cout<<"ADDING INTERFACE: IF INDEX = "<<iface->ifi_index<<" ; INTERFACE NAME = "<<m_interfaceMap[iface->ifi_index]<<" ; OPER STATE = "<<oper_state<<endl;
 #endif
          string msgArgs = m_interfaceMap[iface->ifi_index];
+         if (iface->ifi_flags & IFF_UP)
+             runStateMachine(eNETIFC_EVENT_LINK_ADMIN_UP, msgArgs);
          if(oper_state == IF_OPER_UP) //IF_OPER_UP
          {
              runStateMachine(eNETIFC_EVENT_ADD_LINK,msgArgs);
@@ -485,10 +513,12 @@ void NetLinkIfc::processLinkMsg(struct nlmsghdr* nlh)
          {
              runStateMachine(eNETIFC_EVENT_DELETE_LINK,msgArgs);
          }
+         if (!(iface->ifi_flags & IFF_UP))
+             runStateMachine(eNETIFC_EVENT_LINK_ADMIN_DOWN, msgArgs);
       }
       else if (nlh->nlmsg_type == RTM_DELLINK)
       {
-	 event = eNETIFC_EVENT_DELETE_IFC;
+         event = eNETIFC_EVENT_DELETE_IFC;
          std::pair <std::multimap<int,ipaddr>::iterator, std::multimap<int,ipaddr>::iterator> ret = m_ipAddrMap.equal_range(iface->ifi_index);
          for (std::multimap<int,ipaddr>::iterator iter = ret.first; iter != ret.second;++iter)
          {
@@ -643,7 +673,7 @@ void NetLinkIfc::processRouteMsg(struct nlmsghdr* nlh)
       event = eNETIFC_EVENT_DELETE_IPROUTE;
    }
 
-   //Message Args format: family;output interface;destination address;gatewayip;srcip;priority
+   //Message Args format: family;output interface;destination address;gatewayip;srcip;priority;add/delete
    string msgargs = "";
    if (attrs[RTA_OIF]  == NULL ) 
    {
@@ -669,15 +699,7 @@ void NetLinkIfc::processRouteMsg(struct nlmsghdr* nlh)
    }
    else
    {
-      msgargs += "; " ; 
-      if (event == eNETIFC_EVENT_ADD_IP6ROUTE)
-      {
-         msgargs += "::/0";
-      }
-      else
-      {
-         msgargs += "0.0.0.0";
-      }
+      msgargs += (event == eNETIFC_EVENT_ADD_IP6ROUTE || event == eNETIFC_EVENT_DELETE_IP6ROUTE) ? "; ::/0" : "; 0.0.0.0";
    }
 
    if (attrs[RTA_GATEWAY] != NULL)
@@ -712,17 +734,19 @@ void NetLinkIfc::processRouteMsg(struct nlmsghdr* nlh)
       msgargs += "; NA";
    }
 
-   if (attrs[RTA_PRIORITY] != NULL )
+   if (attrs[RTA_PRIORITY] != NULL)
    {
       msgargs += "; ";
       msgargs += std::to_string(*(int*)nla_data(attrs[RTA_PRIORITY]));
    }
    else
    {
-      msgargs += "; NA";
+      msgargs += "; 0";
    }
 
-   if ( dflt_route && route_add && !dst_addr )
+   msgargs += route_add ? "; add" : "; delete";
+
+   if ( dflt_route && !dst_addr )
    {
        publish(NlType::dfltroute,msgargs);
    }
@@ -1183,4 +1207,104 @@ void get_ip_addr_cb(struct nl_object *obj, void *arg)
     {
         cout << "NetLinkIfc:get_ip_addr_cb Malloc Allocation error "<<endl;
     }
+}
+
+void NetLinkIfc::getInterfaces (std::vector<iface_info> &interfaces)
+{
+    nl_cache_refill(m_clisocketId, m_link_cache);
+    nl_cache_foreach(m_link_cache, get_interfaces_cb, &interfaces);
+}
+
+void get_interfaces_cb(struct nl_object *obj, void *arg)
+{
+    struct rtnl_link* link = ((struct rtnl_link*) obj);
+    if (!arg)
+        return;
+    std::vector<iface_info> &interfaces = *(static_cast<std::vector<iface_info>*>(arg));
+
+    if (ARPHRD_ETHER != rtnl_link_get_arptype(link))
+        return;  // if it's not ethernet-based, we are not collecting it (lo, sit0, etc.)
+
+    iface_info interface;
+    interface.m_if_name = rtnl_link_get_name(link);          // TODO: Returns: Link name or NULL if name is not specified
+    interface.m_if_index = rtnl_link_get_ifindex(link);      // TODO: Returns: Interface index or 0 if not set.
+    interface.m_if_flags = rtnl_link_get_flags(link);
+
+    struct nl_addr* addr = rtnl_link_get_addr(link);         // TODO: Returns: Link layer address or NULL if not set.
+    if (addr)
+    {
+        char mac[32];                                        // TODO: use a nice standard macro for MAC address length
+        interface.m_if_macaddr = nl_addr2str(addr, mac, 32);
+    }
+
+    interfaces.push_back(interface);
+}
+
+bool NetLinkIfc::getDefaultRoute(bool is_ipv6, string& interface, string& gateway)
+{
+    default_route r;
+
+    nl_cache_refill(m_clisocketId, m_route_cache);
+    if (nl_cache_is_empty(m_route_cache))
+        return false;
+
+    char n = '0';
+    struct nl_addr *dst = nl_addr_build(is_ipv6 ? AF_INET6 : AF_INET, &n, 0);
+    if (!dst)
+        return false;
+
+    struct rtnl_route *filter = nl_cli_route_alloc();
+    if (!filter)
+        goto free_dst;
+
+    rtnl_route_set_scope(filter, RT_SCOPE_UNIVERSE);
+    rtnl_route_set_family(filter, is_ipv6 ? AF_INET6 : AF_INET);
+    rtnl_route_set_table(filter, RT_TABLE_MAIN);
+    rtnl_route_set_dst(filter, dst);
+
+    nl_cache_foreach_filter(m_route_cache, (struct nl_object*) filter, get_default_route_cb, &r);
+
+    rtnl_route_put(filter);
+free_dst:
+    nl_addr_put(dst);
+
+    auto it = m_interfaceMap.find(r.interface_index);
+    if (it != m_interfaceMap.end())
+    {
+        interface = it->second;
+        gateway = r.gateway;
+        return true;
+    }
+    return false;
+}
+
+void get_default_route_cb(struct nl_object* obj, void* arg)
+{
+    struct rtnl_route *route = (struct rtnl_route *) obj;
+    if (!arg)
+        return;
+    default_route &r = *(static_cast<default_route*>(arg));
+
+    uint32_t priority = rtnl_route_get_priority(route);
+    if (priority >= r.priority)
+        return;
+
+    if (1 != rtnl_route_get_nnexthops(route))
+        return; // ignore routes that have no nexthops or are multipath
+    struct rtnl_nexthop *nh = rtnl_route_nexthop_n(route, 0); // get the only nexthop entry
+    if (!nh)
+        return;
+
+    struct nl_addr* nh_addr = rtnl_route_nh_get_gateway(nh);
+    if (!nh_addr)
+        return;
+
+    r.priority = priority;
+    r.interface_index = rtnl_route_nh_get_ifindex(nh);
+    char addr[INET6_ADDRSTRLEN];
+    r.gateway = nl_addr2str(nh_addr, addr, INET6_ADDRSTRLEN);
+
+#ifdef _DEBUG_
+    cout << "FOUND new default route PRIORITY = " << r.priority <<  " INTERFACE = " << r.interface_index << " GATEWAY = " << r.gateway.c_str() << endl;
+#endif
 }
