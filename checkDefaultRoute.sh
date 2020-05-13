@@ -17,6 +17,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 ##########################################################################
+
+# Message Format: family interface destinationip gatewayip preferred_src metric add/delete
+if [ "$7" != "add" ]; then
+    exit;
+fi
+
 route -n
 ip -6 route
 echo "Input Arguments : $* "
