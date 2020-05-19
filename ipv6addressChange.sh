@@ -41,9 +41,11 @@ if [ "x$cmd" == "xadd" ] && [ "x$flags" == "xglobal" ]; then
       fi
    fi
    if [ $mode == "ipv6" ]; then
+     echo " Creating IPv6 flags for $ifc"
      touch /tmp/estb_ipv6
      touch /tmp/addressaquired_ipv6
    else
+     echo " Creating IPv4 flags for $ifc"
      touch /tmp/estb_ipv4
      touch /tmp/addressaquired_ipv4
   fi
@@ -51,9 +53,11 @@ fi
 
 if [ "x$cmd" == "xdelete" ] && [ "x$flags" == "xglobal" ]; then
    if [ $mode == "ipv6" ]; then
+     echo " Box was previously in IPv6 mode and now in IPv4 mode. Clearing IPv6 flags for $ifc"
      rm -f  /tmp/estb_ipv6
      rm -f /tmp/addressaquired_ipv6
    else
+     echo " Box was previously in IPv4 mode and now in IPv6 mode. Clearing IPv4 flags for $ifc"
      rm -f /tmp/estb_ipv4
      rm -f /tmp/addressaquired_ipv4
   fi
