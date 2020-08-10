@@ -37,7 +37,7 @@ if [ "x$cmd" == "xadd" ] && [ "x$flags" == "xglobal" ]; then
    if [ ! -f /tmp/estb_ipv4 ] && [ ! -f /tmp/estb_ipv6 ];
    then
       if [ -f /lib/rdk/logMilestone.sh ]; then
-        sh /lib/rdk/logMilestone.sh "IP_ACQUISTION_COMPLETED"
+        sh /lib/rdk/logMilestone.sh "IP_ACQUISTION_COMPLETED:$ifc"
       fi
    fi
    if [ $mode == "ipv6" ]; then
