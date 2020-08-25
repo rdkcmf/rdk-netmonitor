@@ -41,9 +41,13 @@ if [ "x$cmd" == "xadd" ] && [ "x$flags" == "xglobal" ]; then
       fi
    fi
    if [ $mode == "ipv6" ]; then
-     echo " Creating IPv6 flags for $ifc"
-     touch /tmp/estb_ipv6
-     touch /tmp/addressaquired_ipv6
+     if [[ $addr == fd* ]] || [[ $addr == fc* ]]; then
+       echo " It is ULA address, no need to create IPv6 flags"
+     else
+       echo " Creating IPv6 flags for $ifc"
+       touch /tmp/estb_ipv6
+       touch /tmp/addressaquired_ipv6
+     fi
    else
      echo " Creating IPv4 flags for $ifc"
      touch /tmp/estb_ipv4
@@ -53,9 +57,13 @@ fi
 
 if [ "x$cmd" == "xdelete" ] && [ "x$flags" == "xglobal" ]; then
    if [ $mode == "ipv6" ]; then
-     echo " Box was previously in IPv6 mode and now in IPv4 mode. Clearing IPv6 flags for $ifc"
-     rm -f  /tmp/estb_ipv6
-     rm -f /tmp/addressaquired_ipv6
+     if [[ $addr == fd* ]] || [[ $addr == fc* ]]; then
+       echo " It is ULA address, no need to clear IPv6 flags"
+     else
+       echo " Box was previously in IPv6 mode and now in IPv4 mode. Clearing IPv6 flags for $ifc"
+       rm -f  /tmp/estb_ipv6
+       rm -f /tmp/addressaquired_ipv6
+     fi
    else
      echo " Box was previously in IPv4 mode and now in IPv6 mode. Clearing IPv4 flags for $ifc"
      rm -f /tmp/estb_ipv4
@@ -63,7 +71,7 @@ if [ "x$cmd" == "xdelete" ] && [ "x$flags" == "xglobal" ]; then
   fi
 fi
 
-echo "Received address Notificatio, cmd = $cmd, mode = $mode,  $IFC= $ifc, addr = $addr, flags = $flags"
+echo "Received address Notification, cmd = $cmd, mode = $mode,  $IFC= $ifc, addr = $addr, flags = $flags"
 
 uptime=`cat /proc/uptime | awk '{print $1}'`
 
