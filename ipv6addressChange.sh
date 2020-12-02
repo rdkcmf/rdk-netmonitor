@@ -83,6 +83,7 @@ if [ $ifc == "$WIFI_INTERFACE" ] || [ $ifc == "$MOCA_INTERFACE" ] || [ $ifc == "
 
      $IPTABLE_CMD -I INPUT -s $addr -p tcp --dport 22 -j ACCEPT
      $IPTABLE_CMD -I OUTPUT -o lo -p tcp -s $addr -d $addr -j ACCEPT
+     systemctl reset-failed tr69agent.service
      systemctl restart tr69agent.service
    fi
 
