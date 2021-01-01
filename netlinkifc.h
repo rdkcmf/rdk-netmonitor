@@ -141,7 +141,8 @@ private:
         void addip6route(string);
         void deleteiproute(string);
         void deleteip6route(string);
-        void updateLinkState(string, bool);
+        void updateLinkAdminState(string, bool);
+        void updateLinkOperState(string, bool);
         void linkAdminUp(string);
         void linkAdminDown(string);
         void addlink(string);

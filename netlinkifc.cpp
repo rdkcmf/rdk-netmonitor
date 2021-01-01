@@ -288,38 +288,47 @@ void NetLinkIfc::publish(NlType type,string args)
    }
 }
 
-void NetLinkIfc::updateLinkState(string link, bool state)
+void NetLinkIfc::updateLinkAdminState(string link, bool adminstate)
 {
     std::lock_guard<std::recursive_mutex> guard(g_state_mutex);
-    static std::map<std::string, bool> link_states;
-    auto it = link_states.find(link);
-    if (it == link_states.end() || it->second != state)
+    static std::map<std::string, bool> link_admin_states;
+    if (link_admin_states[link] != adminstate) // if <link> not in map, insert {<link>, false} before comparing
     {
-        link_states[link] = state;
-        string msgArgs = link + (state ? " up" : " down");
+        link_admin_states[link] = adminstate;
+        string msgArgs = link + (adminstate ? " up" : " down");
         publish(NlType::link, msgArgs);
     }
 }
+
 void NetLinkIfc::linkAdminUp(string link)
 {
-    updateLinkState(link, true);
+    updateLinkAdminState(link, true);
 }
+
 void NetLinkIfc::linkAdminDown(string link)
 {
-    updateLinkState(link, false);
+    updateLinkAdminState(link, false);
+}
+
+void NetLinkIfc::updateLinkOperState(string link, bool operstate)
+{
+    std::lock_guard<std::recursive_mutex> guard(g_state_mutex);
+    static std::map<std::string, bool> link_oper_states;
+    if (link_oper_states[link] != operstate) // if <link> not in map, insert {<link>, false} before comparing
+    {
+        link_oper_states[link] = operstate;
+        string msgArgs = link + (operstate ? " add" : " delete");
+        publish(NlType::link, msgArgs);
+    }
 }
 
 void NetLinkIfc::addlink(string str)
 {
-    std::lock_guard<std::recursive_mutex> guard(g_state_mutex);
-    string msgArgs = str + " add";
-    publish(NlType::link,msgArgs);
+    updateLinkOperState(str, true);
 }
 void NetLinkIfc::deletelink(string str)
 {
-    std::lock_guard<std::recursive_mutex> guard(g_state_mutex);
-    string msgArgs = str + " delete";
-    publish(NlType::link,msgArgs);
+    updateLinkOperState(str, false);
 }
 
 void NetLinkIfc::addipaddr(string str)
@@ -519,7 +528,6 @@ void NetLinkIfc::processLinkMsg(struct nlmsghdr* nlh)
 
     std::lock_guard<std::recursive_mutex> guard(g_state_mutex);
 
-   netifcEvent event = eNETIFC_EVENT_UNKNOWN;
    struct ifinfomsg* iface = (struct ifinfomsg*)nlmsg_data(nlh);
    unsigned int oper_state=0;
    struct nlattr *attrs[IFLA_MAX];
@@ -527,7 +535,7 @@ void NetLinkIfc::processLinkMsg(struct nlmsghdr* nlh)
    {
       attrs[i] = NULL;
    }
-   
+
    if (nlmsg_parse(nlh, sizeof (struct ifinfomsg), attrs, IFLA_MAX, NULL) < 0)
    {
        printf("PROBLEM PArsing Netlink response\n");
@@ -538,7 +546,6 @@ void NetLinkIfc::processLinkMsg(struct nlmsghdr* nlh)
    {
       if (nlh->nlmsg_type == RTM_NEWLINK)
       {
-         event = eNETIFC_EVENT_ADD_IFC;
          m_interfaceMap[iface->ifi_index] = (char *) nla_data(attrs[IFLA_IFNAME]);
          if(attrs[IFLA_OPERSTATE] != NULL)
          {
@@ -550,20 +557,15 @@ void NetLinkIfc::processLinkMsg(struct nlmsghdr* nlh)
          string msgArgs = m_interfaceMap[iface->ifi_index];
          if (iface->ifi_flags & IFF_UP)
              runStateMachine(eNETIFC_EVENT_LINK_ADMIN_UP, msgArgs);
-         if(oper_state == IF_OPER_UP) //IF_OPER_UP
-         {
-             runStateMachine(eNETIFC_EVENT_ADD_LINK,msgArgs);
-         }
-         else if(oper_state == IF_OPER_DOWN) //IF_OPER_DOWN
-         {
-             runStateMachine(eNETIFC_EVENT_DELETE_LINK,msgArgs);
-         }
+         if (oper_state == IF_OPER_UP)
+             runStateMachine(eNETIFC_EVENT_ADD_LINK, msgArgs);
+         else
+             runStateMachine(eNETIFC_EVENT_DELETE_LINK, msgArgs);
          if (!(iface->ifi_flags & IFF_UP))
              runStateMachine(eNETIFC_EVENT_LINK_ADMIN_DOWN, msgArgs);
       }
       else if (nlh->nlmsg_type == RTM_DELLINK)
       {
-         event = eNETIFC_EVENT_DELETE_IFC;
          std::pair <std::multimap<int,ipaddr>::iterator, std::multimap<int,ipaddr>::iterator> ret = m_ipAddrMap.equal_range(iface->ifi_index);
          for (std::multimap<int,ipaddr>::iterator iter = ret.first; iter != ret.second;++iter)
          {
