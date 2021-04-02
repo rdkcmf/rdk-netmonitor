@@ -402,9 +402,8 @@ void NetLinkIfc::populateaddrescompleted(string str)
    hdr.nlmsg_type = RTM_GETROUTE;
 
    struct rtmsg rmsg;
+   memset(&rmsg,0,sizeof(rmsg));
    rmsg.rtm_family = AF_UNSPEC;
-   rmsg.rtm_dst_len = 0;
-   rmsg.rtm_src_len = 0;
 
    struct nl_msg* req = nlmsg_inherit(&hdr);
    nlmsg_append(req,&rmsg,sizeof(struct rtmsg),0);
