@@ -128,10 +128,12 @@ void NetLinkIfc::initialize()
     //stateMachine[eNETIFC_STATE_RUNNING][eNETIFC_EVENT_REINITIALIZE] = &NetLinkIfc::reinitialize;
 
     struct nlmsghdr   hdr;
+   memset(&hdr,0,sizeof(hdr));
 
     hdr.nlmsg_type = RTM_GETLINK;
     hdr.nlmsg_flags = NLM_F_REQUEST | NLM_F_DUMP | NLM_F_ROOT;
     struct ifinfomsg  ifi;
+    memset(&ifi,0,sizeof(ifi));
 
     struct nl_msg* req;
 
@@ -377,11 +379,13 @@ void NetLinkIfc::populateinterfacecompleted(string str)
 #endif
 
    struct nlmsghdr   hdr;
+   memset(&hdr,0,sizeof(hdr));
 
    hdr.nlmsg_flags = NLM_F_REQUEST | NLM_F_DUMP | NLM_F_ROOT;
    hdr.nlmsg_type = RTM_GETADDR | RTM_NEWADDR;
 
    struct ifaddrmsg  ifa;
+   memset(&ifa,0,sizeof(ifa));
    ifa.ifa_family = AF_UNSPEC;
 
    struct nl_msg* req = nlmsg_inherit(&hdr);
@@ -397,6 +401,7 @@ void NetLinkIfc::populateaddrescompleted(string str)
 #endif
 
    struct nlmsghdr   hdr;
+   memset(&hdr,0,sizeof(hdr));
 
    hdr.nlmsg_flags = NLM_F_REQUEST | NLM_F_DUMP | NLM_F_ROOT;
    hdr.nlmsg_type = RTM_GETROUTE;
