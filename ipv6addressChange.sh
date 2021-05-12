@@ -44,9 +44,17 @@ if [ "x$cmd" == "xadd" ] && [ "x$flags" == "xglobal" ]; then
      if [[ $addr == fd* ]] || [[ $addr == fc* ]]; then
        echo " It is ULA address, no need to create IPv6 flags"
      else
-       echo " Creating IPv6 flags for $ifc"
-       touch /tmp/estb_ipv6
-       touch /tmp/addressaquired_ipv6
+       if [ $SKY_EPG_SUPPORT == "true" ]; then
+          if [ $ifc != "dobby0" ]; then
+              echo " Creating IPv6 flags for $ifc"
+              touch /tmp/estb_ipv6
+              touch /tmp/addressaquired_ipv6
+          fi
+       else
+          echo " Creating IPv6 flags for $ifc"
+          touch /tmp/estb_ipv6
+          touch /tmp/addressaquired_ipv6
+       fi
      fi
    else
      echo " Creating IPv4 flags for $ifc"
