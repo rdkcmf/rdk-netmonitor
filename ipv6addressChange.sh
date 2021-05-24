@@ -57,9 +57,13 @@ if [ "x$cmd" == "xadd" ] && [ "x$flags" == "xglobal" ]; then
        fi
      fi
    else
-     echo " Creating IPv4 flags for $ifc"
-     touch /tmp/estb_ipv4
-     touch /tmp/addressaquired_ipv4
+     if [[ $addr == 169.254* ]] || [[ $addr == 192.168.18.10 ]]; then
+	     echo " Ignoring zero config IP or default ip assigned for  $ifc"
+     else
+	     echo " Creating IPv4 flags for $ifc"
+	     touch /tmp/estb_ipv4
+	     touch /tmp/addressaquired_ipv4
+     fi
   fi
 fi
 
