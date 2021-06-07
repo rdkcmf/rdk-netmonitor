@@ -154,6 +154,8 @@ private:
         bool deleteaddrentry(multimap<int,ipaddr>& mmap,int ifindex,ipaddr& addr);
         //void reinitialize(string);
         void publish(NlType type,string args);
+        void clientSocketReinitialize();
+        void nlCacheRefill(struct nl_sock* socket, struct nl_cache* cache);
 
 
         static recursive_mutex g_state_mutex;

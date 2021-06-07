@@ -95,6 +95,44 @@ NetLinkIfc::~NetLinkIfc()
     nl_cache_put(m_addr_cache);
 }
 
+void NetLinkIfc::clientSocketReinitialize()
+{
+    cout<<"clientSocketReinitialize called "<<endl;
+    //free the client socket and cache
+    nl_cache_put(m_link_cache);
+    nl_cache_put(m_route_cache);
+    nl_cache_put(m_addr_cache);
+    nl_socket_free(m_clisocketId);
+
+    //alloc the client socket and connect
+    m_clisocketId = nl_cli_alloc_socket();
+    nl_cli_connect(m_clisocketId, NETLINK_ROUTE);
+
+    //alloc the caches again
+    m_link_cache = nl_cli_link_alloc_cache(m_clisocketId);
+    m_route_cache = nl_cli_route_alloc_cache(m_clisocketId, 0);
+    m_addr_cache = nl_cli_addr_alloc_cache(m_clisocketId);
+
+    //check if refill is working
+    if(nl_cache_refill(m_clisocketId,m_link_cache)!=0)
+        cout<<"nl_cache_refill for link cache failed again after socket refresh "<<endl;
+
+    if(nl_cache_refill(m_clisocketId,m_route_cache)!=0)
+        cout<<"nl_cache_refill for route cache failed again after socket refresh "<<endl;
+
+    if(nl_cache_refill (m_clisocketId,m_addr_cache)!=0)
+        cout<<"nl_cache_refill for addr cache failed again after socket refresh "<<endl;
+}
+
+void NetLinkIfc::nlCacheRefill(struct nl_sock* socket, struct nl_cache* cache)
+{
+    int err = nl_cache_refill(socket, cache);
+    if (err != 0) {
+        cout << "nl_cache_refill returned error code " << err << endl;
+        clientSocketReinitialize();
+    }
+}
+
 void NetLinkIfc::initialize()
 {
     //Initialize state machine.
@@ -596,7 +634,7 @@ void NetLinkIfc::processAddrMsg(struct nlmsghdr* nlh)
    if (ifname.empty())
    {
       char iName[100];
-      nl_cache_refill(m_clisocketId,m_link_cache);
+      nlCacheRefill(m_clisocketId,m_link_cache);
       if (rtnl_link_i2name(m_link_cache,ifindex,iName,sizeof(iName)) != NULL)
       {
          ifname = iName;
@@ -799,8 +837,8 @@ void NetLinkIfc::deleteinterfaceip(string ifc, unsigned int family)
    struct rtnl_addr *addr;
 
    addr = nl_cli_addr_alloc();
-   nl_cache_refill(m_clisocketId,m_link_cache);
-   nl_cache_refill(m_clisocketId,m_addr_cache);
+   nlCacheRefill(m_clisocketId,m_link_cache);
+   nlCacheRefill(m_clisocketId,m_addr_cache);
 
    int ifindex = 0;
 
@@ -844,8 +882,8 @@ bool NetLinkIfc::userdefinedrouteexists(string ifc, string gateway,unsigned int 
    std::lock_guard<std::recursive_mutex> guard(g_state_mutex);
    struct rtnl_route *route = nl_cli_route_alloc();
 
-   nl_cache_refill(m_clisocketId,m_link_cache);
-   nl_cache_refill(m_clisocketId,m_route_cache);
+   nlCacheRefill(m_clisocketId,m_link_cache);
+   nlCacheRefill(m_clisocketId,m_route_cache);
 
    int ifindex = 0;
 
@@ -884,8 +922,8 @@ bool NetLinkIfc::routeexists(string ifc, string gateway,unsigned int family,unsi
    struct rtnl_route *route;
 
    route = nl_cli_route_alloc();
-   nl_cache_refill(m_clisocketId,m_link_cache);
-   nl_cache_refill(m_clisocketId,m_route_cache);
+   nlCacheRefill(m_clisocketId,m_link_cache);
+   nlCacheRefill(m_clisocketId,m_route_cache);
 
    int ifindex = 0;
 
@@ -922,7 +960,7 @@ void NetLinkIfc::changedefaultroutepriority(string ifc, string gateway,unsigned 
    int nf = 0;
 
    route = nl_cli_route_alloc();
-   nl_cache_refill(m_clisocketId,m_link_cache);
+   nlCacheRefill(m_clisocketId,m_link_cache);
 
    int ifindex = 0;
    cout <<"Entered Function: "<<__FUNCTION__<<", line number: "<<__LINE__<<endl;
@@ -962,7 +1000,7 @@ void NetLinkIfc::changedefaultroutepriority(string ifc, string gateway,unsigned 
    //2. Delete all of them in a single go.(perhaps using some scoping rules).
    //
    force_del_default_route(ifc);
-   nl_cache_refill(m_clisocketId,m_route_cache);
+   nlCacheRefill(m_clisocketId,m_route_cache);
 
    if (routeexists(ifc, gateway,family,priority))
    {
@@ -1002,8 +1040,8 @@ void NetLinkIfc::deleteinterfaceroutes(string ifc, unsigned int family)
    int nf = 0;
 
    route = nl_cli_route_alloc();
-   nl_cache_refill(m_clisocketId,m_link_cache);
-   nl_cache_refill(m_clisocketId,m_route_cache);
+   nlCacheRefill(m_clisocketId,m_link_cache);
+   nlCacheRefill(m_clisocketId,m_route_cache);
 
    int ifindex = 0;
 
@@ -1101,7 +1139,7 @@ void delete_route_cb(struct nl_object *obj, void *arg)
 void NetLinkIfc::activatelink(string ifc)
 {
    std::lock_guard<std::recursive_mutex> guard(g_state_mutex);
-   nl_cache_refill(m_clisocketId,m_link_cache);
+   nlCacheRefill(m_clisocketId,m_link_cache);
 
    struct rtnl_link *link, *up, *down;
 
@@ -1158,8 +1196,8 @@ bool NetLinkIfc::getIpaddr(string ifc,unsigned int family,vector<string>& ipaddr
         cout<<"NetLinkIfc::getIpaddr : wrong address family "<< family <<endl;
         return false;
     }
-    nl_cache_refill(m_clisocketId,m_link_cache);
-    nl_cache_refill(m_clisocketId,m_addr_cache);
+    nlCacheRefill(m_clisocketId,m_link_cache);
+    nlCacheRefill(m_clisocketId,m_addr_cache);
     if (!(ifindex = rtnl_link_name2i(m_link_cache, ifc.c_str())))
     {
         cout <<ENOENT<<" Link "<<ifc<<" does not exist"<<endl;
@@ -1215,7 +1253,7 @@ void get_ip_addr_cb(struct nl_object *obj, void *arg)
 
 void NetLinkIfc::getInterfaces (std::vector<iface_info> &interfaces)
 {
-    nl_cache_refill(m_clisocketId, m_link_cache);
+    nlCacheRefill(m_clisocketId, m_link_cache);
     nl_cache_foreach(m_link_cache, get_interfaces_cb, &interfaces);
 }
 
@@ -1248,7 +1286,7 @@ bool NetLinkIfc::getDefaultRoute(bool is_ipv6, string& interface, string& gatewa
 {
     default_route r;
 
-    nl_cache_refill(m_clisocketId, m_route_cache);
+    nlCacheRefill(m_clisocketId, m_route_cache);
     if (nl_cache_is_empty(m_route_cache))
         return false;
 
