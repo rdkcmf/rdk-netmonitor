@@ -245,7 +245,7 @@ bool NetLinkIfc::addipaddrentry(multimap<int,ipaddr>& mmap,int ifindex,ipaddr& a
 #ifdef _DEBUG_
             cout<<"Same Adress found ignoring: "<<addr.address<<endl;
 #endif
-            return false;
+            return true;
          }
       }
    }
