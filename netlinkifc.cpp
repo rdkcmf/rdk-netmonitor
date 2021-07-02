@@ -234,6 +234,7 @@ void NetLinkIfc::tokenize(string& inputStr, vector<string>& tokens)
 
 bool NetLinkIfc::addipaddrentry(multimap<int,ipaddr>& mmap,int ifindex,ipaddr& addr)
 {
+   std::lock_guard<std::recursive_mutex> guard(g_state_mutex);
    multimap<int,ipaddr>::iterator it = mmap.find(ifindex);
    if (it != mmap.end())
    {
@@ -245,7 +246,7 @@ bool NetLinkIfc::addipaddrentry(multimap<int,ipaddr>& mmap,int ifindex,ipaddr& a
 #ifdef _DEBUG_
             cout<<"Same Adress found ignoring: "<<addr.address<<endl;
 #endif
-            return true;
+            return false;
          }
       }
    }
@@ -255,6 +256,7 @@ bool NetLinkIfc::addipaddrentry(multimap<int,ipaddr>& mmap,int ifindex,ipaddr& a
 
 bool NetLinkIfc::deleteaddrentry(multimap<int,ipaddr>& mmap,int ifindex,ipaddr& addr)
 {
+   std::lock_guard<std::recursive_mutex> guard(g_state_mutex);
    multimap<int,ipaddr>::iterator it = mmap.find(ifindex);
    if (it != mmap.end())
    {
