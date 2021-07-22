@@ -126,6 +126,7 @@ void NetLinkIfc::clientSocketReinitialize()
 
 void NetLinkIfc::nlCacheRefill(struct nl_sock* socket, struct nl_cache* cache)
 {
+   std::lock_guard<std::recursive_mutex> guard(g_state_mutex);
     int err = nl_cache_refill(socket, cache);
     if (err != 0) {
         cout << "nl_cache_refill returned error code " << err << endl;
