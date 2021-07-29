@@ -128,7 +128,6 @@ private:
         netifcState m_state;
         netifcEvent m_event;
 
-        map<int,string> m_interfaceMap;
         multimap<int,ipaddr> m_ipAddrMap;
         NetLinkIfc ();
         void populateinterfacecompleted(string);
@@ -147,27 +146,31 @@ private:
         void linkAdminDown(string);
         void addlink(string);
         void deletelink(string);
-        void processAddrMsg(struct nlmsghdr* nlh);
-        void processLinkMsg(struct nlmsghdr* nlh);
-        void processRouteMsg(struct nlmsghdr* nlh);
+	void processlink_rtnl(string action,struct rtnl_link* link);
+	void processaddr_rtnl(string action, struct rtnl_addr* addr);
+	void processroute_rtnl(string action, struct rtnl_route* addr);
         void tokenize(string& inputStr, vector<string>& tokens);
         bool addipaddrentry(multimap<int,ipaddr>& mmap,int ifindex,ipaddr& addr);
         bool deleteaddrentry(multimap<int,ipaddr>& mmap,int ifindex,ipaddr& addr);
         //void reinitialize(string);
         void publish(NlType type,string args);
-        void clientSocketReinitialize();
-        void nlCacheRefill(struct nl_sock* socket, struct nl_cache* cache);
 
 
         static recursive_mutex g_state_mutex;
         static mutex g_instance_mutex;
         static NetLinkIfc* pInstance;
-        static void receiveMsg(NetLinkIfc* instance);
-        static int receiveNewMsg(struct nl_msg *msg, void *arg);
+        static void cacheMgrMsg(NetLinkIfc* instance);
+
+	static void link_change_cb(struct nl_cache *cache, struct nl_object *obj, int action, void *data);
+	static void route_change_cb(struct nl_cache *cache, struct nl_object *obj, int action, void *data);
+	static void addr_change_cb(struct nl_cache *cache, struct nl_object *obj, int action, void *data);
+	static void link_init_cb(struct nl_object *obj , void * arg);
+	static void addr_init_cb(struct nl_object *obj , void * arg);
+	static void route_init_cb(struct nl_object *obj , void * arg);
 
         // LIstening socket and its related addresses etc.
-        struct nl_sock * m_socketId;
         struct nl_sock * m_clisocketId;
+	struct nl_cache_mngr * m_cachemgr;
         struct nl_cache * m_link_cache; 
         struct nl_cache * m_route_cache;
         struct nl_cache * m_addr_cache;
@@ -186,7 +189,6 @@ public:
         void activatelink(string ifc);
 	void changedefaultroutepriority(string ifc, string gateway,unsigned int family,unsigned int priority,unsigned int setpriority);
 	bool routeexists(string ifc, string gateway,unsigned int family,unsigned int priority);
-	bool userdefinedrouteexists(string ifc, string gateway,unsigned int family);
         bool getIpaddr(string ifc,unsigned int family,vector<string>& ipaddr);
         void getInterfaces(std::vector<iface_info> &interfaces);
         bool getDefaultRoute(bool is_ipv6, string& interface, string& gateway);
@@ -211,9 +213,6 @@ void modify_link_cb(struct nl_object *obj, void *arg);
 void get_ip_addr_cb(struct nl_object *obj, void *arg);
 void get_interfaces_cb(struct nl_object *obj, void *arg);
 void get_default_route_cb(struct nl_object *obj, void *arg);
-void modify_route_cb(struct nl_object *obj, void *arg);
-void update_route_present(struct nl_object *obj, void *arg);
-void update_user_route_present(struct nl_object *obj, void *arg);
 }
 
 #endif// _NETLINKIFC_H_

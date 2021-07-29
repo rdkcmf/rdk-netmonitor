@@ -19,6 +19,7 @@
 #include "netlinkifc.h"
 #include <fstream>
 #include <map>
+#include <unistd.h>
 
 map<string,NlType> type_map =
 {
@@ -43,6 +44,13 @@ int main ()
     }
 
     cfgFile.close();
+
+    ofstream pidfile("/run/nlmon.pid",ios::out);
+    if (pidfile.is_open())
+    {
+        pidfile<<getpid()<<"\n";
+        pidfile.close();
+    }
 
     netifc->initialize();
     netifc->run();
