@@ -908,9 +908,13 @@ void NetLinkIfc::processlink_rtnl(string action,struct rtnl_link* link)
     {
         runStateMachine(eNETIFC_EVENT_ADD_LINK, msgArgs);
     }
-    else
+    else if (operstate == IF_OPER_DOWN)
     {
         runStateMachine(eNETIFC_EVENT_DELETE_LINK, msgArgs);
+    }
+    else
+    {
+        cout<<"Unrecognized operstate received. Operstate= "<<operstate<<"; Link Name = "<<msgArgs.c_str()<<endl;
     }
 
     if (!(flags & IFF_UP))
