@@ -49,11 +49,11 @@ NetLinkIfc* NetLinkIfc::get_instance()
     return pInstance;
 }
 
-NetLinkIfc::NetLinkIfc ():m_state(eNETIFC_STATE_INIT),m_event(eNETIFC_EVENT_UNKNOWN),m_cachemgr(NULL),m_clisocketId(NULL)
+NetLinkIfc::NetLinkIfc ():m_state(eNETIFC_STATE_INIT),m_event(eNETIFC_EVENT_UNKNOWN),m_cachemgr(NULL),m_clisocketId(NULL),m_link_clone(NULL),m_addr_clone(NULL),m_route_clone(NULL)
 {
     //1. start socket.
     //2. Setup all the needed flags
-    if (nl_cache_mngr_alloc(NULL,NETLINK_ROUTE,NL_AUTO_PROVIDE,&m_cachemgr) != 0)
+    if (nl_cache_mngr_alloc(NULL,NETLINK_ROUTE,0,&m_cachemgr) != 0)
     {
        //throw exception.For now print error.
        printf("Error Allocating cacheManager\n");
@@ -179,49 +179,7 @@ void NetLinkIfc::tokenize(string& inputStr, vector<string>& tokens)
    }
 }
 
-bool NetLinkIfc::addipaddrentry(multimap<int,ipaddr>& mmap,int ifindex,ipaddr& addr)
-{
-   std::lock_guard<std::recursive_mutex> guard(g_state_mutex);
-   multimap<int,ipaddr>::iterator it = mmap.find(ifindex);
-   if (it != mmap.end())
-   {
-      std::pair <std::multimap<int,ipaddr>::iterator, std::multimap<int,ipaddr>::iterator> ret = mmap.equal_range(ifindex);
-      for (it = ret.first;it != ret.second;++it)
-      {
-         if (it->second == addr)
-         {
-#ifdef _DEBUG_
-            cout<<"Same Adress found ignoring: "<<addr.address<<endl;
-#endif
-            return false;
-         }
-      }
-   }
-   mmap.insert(std::pair<int,ipaddr>(ifindex,addr));
-   return true;
-}
 
-bool NetLinkIfc::deleteaddrentry(multimap<int,ipaddr>& mmap,int ifindex,ipaddr& addr)
-{
-   std::lock_guard<std::recursive_mutex> guard(g_state_mutex);
-   multimap<int,ipaddr>::iterator it = mmap.find(ifindex);
-   if (it != mmap.end())
-   {
-      std::pair <std::multimap<int,ipaddr>::iterator, std::multimap<int,ipaddr>::iterator> ret = mmap.equal_range(ifindex);
-      for (it = ret.first;it != ret.second;++it)
-      {
-         if (it->second == addr)
-         {
-#ifdef _DEBUG_
-            cout<<"Deleting Address: "<<addr.address<<endl;
-#endif
-            mmap.erase(it);
-            return true;
-         }
-      }
-   }
-   return false;
-}
 
 void NetLinkIfc::publish(NlType type,string args)
 {
@@ -452,12 +410,17 @@ void NetLinkIfc::deleteinterfaceip(string ifc, unsigned int family)
    std::lock_guard<std::recursive_mutex> guard(g_state_mutex);
    struct rtnl_addr *addr;
 
+   if ((m_link_clone == NULL) || (m_addr_clone == NULL))
+   {
+      cout <<"NetLinkIfc::deleteinterfaceip: Cache is not populated yet. Returning"<<endl;
+      return;
+   }
    addr = nl_cli_addr_alloc();
 
    int ifindex = 0;
 
    //1. populate index.
-   if (!(ifindex = rtnl_link_name2i(m_link_cache, ifc.c_str())))
+   if (!(ifindex = rtnl_link_name2i(m_link_clone, ifc.c_str())))
    {
       cout <<ENOENT<<" Link "<<ifc<<" does not exist"<<endl;
       return;
@@ -469,7 +432,7 @@ void NetLinkIfc::deleteinterfaceip(string ifc, unsigned int family)
 
   //3. Set scope to Global
   rtnl_addr_set_scope(addr, 0);
-  nl_cache_foreach_filter(m_addr_cache, ((struct nl_object *) (addr)), delete_addr_cb, m_clisocketId);
+  nl_cache_foreach_filter(m_addr_clone, ((struct nl_object *) (addr)), delete_addr_cb, m_clisocketId);
   rtnl_addr_put(addr);
 }
 
@@ -492,6 +455,11 @@ void NetLinkIfc::deleteinterfaceroutes(string ifc, unsigned int family)
 {
    std::lock_guard<std::recursive_mutex> guard(g_state_mutex);
 
+   if ((m_link_clone == NULL) || (m_route_clone == NULL))
+   {
+       cout<<"NetLinkIfc::deleteinterfaceroutes: Route Cache or Link Cache is not Populated. Returning"<<endl;
+       return;
+   }
    struct rtnl_route *route;
    int nf = 0;
 
@@ -500,7 +468,7 @@ void NetLinkIfc::deleteinterfaceroutes(string ifc, unsigned int family)
    int ifindex = 0;
 
    //1. populate index.
-   if (!(ifindex = rtnl_link_name2i(m_link_cache, ifc.c_str())))
+   if (!(ifindex = rtnl_link_name2i(m_link_clone, ifc.c_str())))
    {
 #ifdef _DEBUG_
       cout <<ENOENT<<" Link "<<ifc<<" does not exist"<<endl;
@@ -516,7 +484,7 @@ void NetLinkIfc::deleteinterfaceroutes(string ifc, unsigned int family)
    rtnl_route_nh_set_ifindex(nh,ifindex);
    rtnl_route_add_nexthop(route, nh);
 
-   nl_cache_foreach_filter(m_route_cache, (struct nl_object *)route, delete_route_cb, m_clisocketId);
+   nl_cache_foreach_filter(m_route_clone, (struct nl_object *)route, delete_route_cb, m_clisocketId);
    rtnl_route_put(route);
 }
 
@@ -546,6 +514,12 @@ void NetLinkIfc::activatelink(string ifc)
 {
    std::lock_guard<std::recursive_mutex> guard(g_state_mutex);
 
+   if (m_link_clone == NULL)
+   {
+       cout<<"NetLinkIfc::activatelink: Link Cache is not populated. Returning"<<endl;
+       return;
+   }
+
    struct rtnl_link *link, *up, *down;
 
    link = nl_cli_link_alloc();
@@ -558,9 +532,9 @@ void NetLinkIfc::activatelink(string ifc)
    nlargs linkArg;
    linkArg.socketId = m_clisocketId;
    linkArg.linkInfo = down;
-   nl_cache_foreach_filter(m_link_cache, OBJ_CAST(link), modify_link_cb, &linkArg);
+   nl_cache_foreach_filter(m_link_clone, OBJ_CAST(link), modify_link_cb, &linkArg);
    linkArg.linkInfo = up;
-   nl_cache_foreach_filter(m_link_cache, OBJ_CAST(link), modify_link_cb, &linkArg);
+   nl_cache_foreach_filter(m_link_clone, OBJ_CAST(link), modify_link_cb, &linkArg);
    rtnl_link_put(link);
    rtnl_link_put(up);
    rtnl_link_put(down);
@@ -587,6 +561,12 @@ void modify_link_cb(struct nl_object *obj, void *arg)
 bool NetLinkIfc::getIpaddr(string ifc,unsigned int family,vector<string>& ipaddr)
 {
     int ifindex = 0;
+    std::lock_guard<std::recursive_mutex> guard(g_state_mutex);
+    if ((m_link_clone == NULL) || (m_addr_clone == NULL))
+    {
+        cout<<"NetLinkIfc::getIpaddr : Link or Address cache is not populated"<<endl;
+        return false;
+    }
     if (ifc.empty())
     {
         cout<<"NetLinkIfc::getIpaddr : no interface name"<<endl;
@@ -601,7 +581,7 @@ bool NetLinkIfc::getIpaddr(string ifc,unsigned int family,vector<string>& ipaddr
         cout<<"NetLinkIfc::getIpaddr : wrong address family "<< family <<endl;
         return false;
     }
-    if (!(ifindex = rtnl_link_name2i(m_link_cache, ifc.c_str())))
+    if (!(ifindex = rtnl_link_name2i(m_link_clone, ifc.c_str())))
     {
         cout <<ENOENT<<" Link "<<ifc<<" does not exist"<<endl;
         return false;
@@ -619,7 +599,8 @@ bool NetLinkIfc::getIpaddr(string ifc,unsigned int family,vector<string>& ipaddr
     rtnl_addr_set_ifindex(rtnlAddr, ifindex);
     rtnl_addr_set_family(rtnlAddr, family);
     rtnl_addr_set_scope(rtnlAddr, 0);
-    nl_cache_foreach_filter(m_addr_cache, (struct nl_object *) rtnlAddr,get_ip_addr_cb, (void *)&ipaddr);
+
+    nl_cache_foreach_filter(m_addr_clone, (struct nl_object *) rtnlAddr,get_ip_addr_cb, (void *)&ipaddr);
     if (rtnlAddr)
         rtnl_addr_put(rtnlAddr);
     return true;
@@ -656,7 +637,15 @@ void get_ip_addr_cb(struct nl_object *obj, void *arg)
 
 void NetLinkIfc::getInterfaces (std::vector<iface_info> &interfaces)
 {
-    nl_cache_foreach(m_link_cache, get_interfaces_cb, &interfaces);
+   std::lock_guard<std::recursive_mutex> guard(g_state_mutex);
+   if (m_link_clone == NULL)
+   {
+       cout<<"NetLinkIfc::getInterfaces: Link Cache is not updated yet. Returning"<<endl;
+       return;
+   }
+   std::set<iface_info,ifaceLessThan> ifset;
+    nl_cache_foreach(m_link_clone, get_interfaces_cb, &ifset);
+    interfaces.assign(ifset.begin(),ifset.end());
 }
 
 void get_interfaces_cb(struct nl_object *obj, void *arg)
@@ -664,31 +653,41 @@ void get_interfaces_cb(struct nl_object *obj, void *arg)
     struct rtnl_link* link = ((struct rtnl_link*) obj);
     if (!arg)
         return;
-    std::vector<iface_info> &interfaces = *(static_cast<std::vector<iface_info>*>(arg));
+    std::set<iface_info,ifaceLessThan> *interfaces = reinterpret_cast<std::set<iface_info,ifaceLessThan>*>(arg);
 
     if (ARPHRD_ETHER != rtnl_link_get_arptype(link))
         return;  // if it's not ethernet-based, we are not collecting it (lo, sit0, etc.)
 
     iface_info interface;
-    interface.m_if_name = rtnl_link_get_name(link);          // TODO: Returns: Link name or NULL if name is not specified
+    if (rtnl_link_get_name(link) != NULL)
+    {
+        interface.m_if_name.resize(IFNAMSIZ,'\0');
+        interface.m_if_name = rtnl_link_get_name(link);          // TODO: Returns: Link name or NULL if name is not specified
+    }
     interface.m_if_index = rtnl_link_get_ifindex(link);      // TODO: Returns: Interface index or 0 if not set.
     interface.m_if_flags = rtnl_link_get_flags(link);
 
     struct nl_addr* addr = rtnl_link_get_addr(link);         // TODO: Returns: Link layer address or NULL if not set.
     if (addr)
     {
-        char mac[32];                                        // TODO: use a nice standard macro for MAC address length
-        interface.m_if_macaddr = nl_addr2str(addr, mac, 32);
+        interface.m_if_macaddr.resize(20,'\0');
+        nl_addr2str(addr, (char*)interface.m_if_macaddr.c_str(), interface.m_if_macaddr.capacity());
     }
 
-    interfaces.push_back(interface);
+    interfaces->insert(interface);
 }
 
 bool NetLinkIfc::getDefaultRoute(bool is_ipv6, string& interface, string& gateway)
 {
     default_route r;
+    std::lock_guard<std::recursive_mutex> guard(g_state_mutex);
 
-    if (nl_cache_is_empty(m_route_cache))
+    if ((m_link_clone == NULL) || (m_route_clone == NULL))
+    {
+        cout<<"NetLinkIfc::getDefaultRoute: Link cache or route Cache is empty. Returning."<<endl;
+        return false;
+    }
+    if (nl_cache_is_empty(m_route_clone))
         return false;
 
     char n = '0';
@@ -704,15 +703,15 @@ bool NetLinkIfc::getDefaultRoute(bool is_ipv6, string& interface, string& gatewa
     rtnl_route_set_family(filter, is_ipv6 ? AF_INET6 : AF_INET);
     rtnl_route_set_table(filter, RT_TABLE_MAIN);
     rtnl_route_set_dst(filter, dst);
-
-    nl_cache_foreach_filter(m_route_cache, (struct nl_object*) filter, get_default_route_cb, &r);
+    
+    nl_cache_foreach_filter(m_route_clone, (struct nl_object*) filter, get_default_route_cb, &r);
 
     rtnl_route_put(filter);
 free_dst:
     nl_addr_put(dst);
 
-     interface.resize(1024,'\0');
-     if (rtnl_link_i2name(m_link_cache,r.interface_index,(char*)(interface.c_str()),1024) != NULL)
+     interface.resize(IFNAMSIZ,'\0');
+     if (rtnl_link_i2name(m_link_clone,r.interface_index,(char*)(interface.c_str()),interface.capacity()) != NULL)
      {
          gateway = r.gateway;
          return true;
@@ -743,8 +742,8 @@ void get_default_route_cb(struct nl_object* obj, void* arg)
 
     r.priority = priority;
     r.interface_index = rtnl_route_nh_get_ifindex(nh);
-    char addr[INET6_ADDRSTRLEN];
-    r.gateway = nl_addr2str(nh_addr, addr, INET6_ADDRSTRLEN);
+    r.gateway.resize(INET6_ADDRSTRLEN,'\0');
+    inet_ntop(rtnl_route_get_family(route),nl_addr_get_binary_addr(rtnl_route_nh_get_gateway(nh)),(char*)r.gateway.c_str(),r.gateway.capacity());
 
 #ifdef _DEBUG_
     cout << "FOUND new default route PRIORITY = " << r.priority <<  " INTERFACE = " << r.interface_index << " GATEWAY = " << r.gateway.c_str() << endl;
@@ -865,9 +864,18 @@ void NetLinkIfc::route_change_cb(struct nl_cache *cache, struct nl_object *obj, 
 
 void NetLinkIfc::processlink_rtnl(string action,struct rtnl_link* link)
 {
+
+    if (link == NULL)
+    {
+        cout<<"Link Object in processlink_rtnl is NULL."<<endl;
+        return;
+    }
+
+    updateCloneConfig(m_link_cache,m_link_clone);
+    cout<<"Entering processlink_rtnl function"<<endl;
     //1. Interface name.
     string msgArgs;
-    msgArgs.resize(1024,'\0');
+    msgArgs.resize(IFNAMSIZ + 10,'\0');
     if (rtnl_link_get_name(link) != NULL)
     {
         msgArgs = rtnl_link_get_name(link);
@@ -876,26 +884,9 @@ void NetLinkIfc::processlink_rtnl(string action,struct rtnl_link* link)
     int ifindex = rtnl_link_get_ifindex(link);
     if (action == "delete")
     {
-        string ifcname(1024,'\0');
+        string ifcname(IFNAMSIZ,'\0');
         ifcname = rtnl_link_get_name(link);
-        std::pair <std::multimap<int,ipaddr>::iterator, std::multimap<int,ipaddr>::iterator> ret = m_ipAddrMap.equal_range(ifindex);
-        for (std::multimap<int,ipaddr>::iterator iter = ret.first; iter != ret.second;++iter)
-        {
-            string msgArgs = ifcname + ";" + iter->second.address + ";" + (iter->second.global ? "global":"local");
-#ifdef _DEBUG_
-            cout<<"DELETING INTERFACE: IF INDEX = "<<ifindex<<" ; INTERFACE NAME = "<<ifcname.c_str()<<endl;
-#endif
-            char addrStr[32] = {0};
-            if (inet_pton(AF_INET,iter->second.address.c_str(),addrStr))
-            {
-                runStateMachine(eNETIFC_EVENT_DELETE_IPADDR,msgArgs);
-            }
-            else
-            {
-                runStateMachine(eNETIFC_EVENT_DELETE_IP6ADDR,msgArgs);
-            }
-        }
-        m_ipAddrMap.erase(ifindex);
+        cout<<"Exiting processlink_rtnl function . Received Delete message for link "<<ifcname.c_str()<<endl;
         return;
     }   
     unsigned int operstate = rtnl_link_get_operstate(link);
@@ -921,20 +912,33 @@ void NetLinkIfc::processlink_rtnl(string action,struct rtnl_link* link)
     {
         runStateMachine(eNETIFC_EVENT_LINK_ADMIN_DOWN, msgArgs);
     }
+    cout<<"Exiting processlink_rtnl function"<<endl;
 
 }
 void NetLinkIfc::processaddr_rtnl(string action, struct rtnl_addr* addr)
 {
-    std::string ifname;
-    ifname.resize(512,'\0');
+    if (addr == NULL)
+    {
+        cout<<"Addr Object in processaddr_rtnl is NULL."<<endl;
+        return;
+    }
 
+
+   
+    updateCloneConfig(m_addr_cache,m_addr_clone);
     //fileter.
     if (action == "change")
     {
         return;
     }
+    cout<<"Entering processaddr_rtnl function"<<endl;
 
-    ifname = rtnl_link_get_name(rtnl_addr_get_link(addr));
+    int ifindex = rtnl_addr_get_ifindex(addr);
+    std::string ifname;
+    ifname.resize(IFNAMSIZ,'\0');
+
+    //Extract it by using index and link cache.
+    rtnl_link_i2name(m_link_cache,ifindex,(char*)(ifname.c_str()),ifname.capacity());
 
     if (rtnl_addr_get_label(addr) != NULL)
     {
@@ -942,15 +946,15 @@ void NetLinkIfc::processaddr_rtnl(string action, struct rtnl_addr* addr)
     }
 
     std::string address;
-    address.resize(1024,'\0');
+    address.resize(INET6_ADDRSTRLEN,'\0');
 
     if ((rtnl_addr_get_peer(addr) != NULL) && (nl_addr_get_len(rtnl_addr_get_peer(addr)) > 0))
     {
-        inet_ntop(rtnl_addr_get_family(addr),nl_addr_get_binary_addr(rtnl_addr_get_peer(addr)),(char*)address.c_str(),1024);
+        inet_ntop(rtnl_addr_get_family(addr),nl_addr_get_binary_addr(rtnl_addr_get_peer(addr)),(char*)address.c_str(),address.capacity());
     }
     else if ((rtnl_addr_get_local(addr) != NULL) && (nl_addr_get_len(rtnl_addr_get_local(addr)) > 0))
     {
-        inet_ntop(rtnl_addr_get_family(addr),nl_addr_get_binary_addr(rtnl_addr_get_local(addr)),(char*)address.c_str(),1024);
+        inet_ntop(rtnl_addr_get_family(addr),nl_addr_get_binary_addr(rtnl_addr_get_local(addr)),(char*)address.c_str(),address.capacity());
     }
 
     address.erase(std::remove_if(address.begin(),address.end(),[](char c) {
@@ -959,31 +963,22 @@ void NetLinkIfc::processaddr_rtnl(string action, struct rtnl_addr* addr)
     string family = rtnl_addr_get_family(addr) == AF_INET ? "IPV4":"IPV6";
     int prefix = rtnl_addr_get_prefixlen(addr);
 
-    ipaddr loc_addr;
-    loc_addr.address = address;
-    loc_addr.global = (rtnl_addr_get_scope(addr) == 0);
-    loc_addr.family = rtnl_addr_get_family(addr);
-    loc_addr.prefix = rtnl_addr_get_prefixlen(addr);
-    int ifindex = rtnl_addr_get_ifindex(addr);
     netifcEvent event = eNETIFC_EVENT_UNKNOWN;
 
-    string msgargs = ifname + ";" + address + ";" + (loc_addr.global ? "global":"local");
+    string msgargs = ifname + ";" + address + ";" + (rtnl_addr_get_scope(addr) == 0 ? "global":"local");
 
     msgargs.erase(std::remove_if(msgargs.begin(),msgargs.end(),[](char c) {
                                return !(isalnum(c) || (c == '/') || (c == ' ') || (c == ':') || (c == '-') || (c == '.') || (c == '@') || (c == '_') || (c == '[') || (c == ']') || (c == ';'));}),msgargs.end());
     if (action == "add")
     {
-        if (addipaddrentry(m_ipAddrMap,ifindex,loc_addr))
-        {
-            event = loc_addr.family == AF_INET6 ? eNETIFC_EVENT_ADD_IP6ADDR : eNETIFC_EVENT_ADD_IPADDR;
-        }
+        event = rtnl_addr_get_family(addr) == AF_INET6 ? eNETIFC_EVENT_ADD_IP6ADDR : eNETIFC_EVENT_ADD_IPADDR;
     }
     else if (action == "delete")
     {
-        deleteaddrentry(m_ipAddrMap,ifindex,loc_addr);
-        event = loc_addr.family == AF_INET6 ? eNETIFC_EVENT_DELETE_IP6ADDR : eNETIFC_EVENT_DELETE_IPADDR;
+        event = rtnl_addr_get_family(addr) == AF_INET6 ? eNETIFC_EVENT_DELETE_IP6ADDR : eNETIFC_EVENT_DELETE_IPADDR;
     }
     runStateMachine(event,msgargs);
+    cout<<"Exiting processaddr_rtnl function"<<endl;
 }
 
 void NetLinkIfc::processroute_rtnl(string action, struct rtnl_route* route)
@@ -992,9 +987,12 @@ void NetLinkIfc::processroute_rtnl(string action, struct rtnl_route* route)
     string msgargs;
     msgargs = std::to_string(rtnl_route_get_family(route));
     int oifindex = 0;
-    string gwaddr(1024,'\0'),prefsrc(1024,'\0'),dstaddr(1024,'\0');
+    string gwaddr(INET6_ADDRSTRLEN,'\0'),prefsrc(INET6_ADDRSTRLEN,'\0'),dstaddr(INET6_ADDRSTRLEN,'\0');
     bool dflt_route = false;
     bool dst_addr = false;
+
+    updateCloneConfig(m_route_cache,m_route_clone);
+    cout<<"Entering processroute_rtnl function"<<endl;
 
     gwaddr = "NA";
     prefsrc = "NA";
@@ -1006,8 +1004,8 @@ void NetLinkIfc::processroute_rtnl(string action, struct rtnl_route* route)
         oifindex = rtnl_route_nh_get_ifindex(nh);
         if ((rtnl_route_nh_get_gateway(nh) != NULL) && (nl_addr_get_len(rtnl_route_nh_get_gateway(nh)) > 0))
         {
-            gwaddr.resize(1024,'\0');
-            inet_ntop(rtnl_route_get_family(route),nl_addr_get_binary_addr(rtnl_route_nh_get_gateway(nh)),(char*)gwaddr.c_str(),1024);
+            gwaddr.resize(INET6_ADDRSTRLEN,'\0');
+            inet_ntop(rtnl_route_get_family(route),nl_addr_get_binary_addr(rtnl_route_nh_get_gateway(nh)),(char*)gwaddr.c_str(),gwaddr.capacity());
             dflt_route = true;
         }
     }
@@ -1015,19 +1013,20 @@ void NetLinkIfc::processroute_rtnl(string action, struct rtnl_route* route)
     if (oifindex == 0)
     {
         cout<<"Output Index is missing"<<endl;
+        cout<<"Exiting processroute_rtnl function"<<endl;
         return;
     }
     if ((rtnl_route_get_dst(route) != NULL) && (nl_addr_get_len(rtnl_route_get_dst(route)) > 0))
     {
-        dstaddr.resize(1024,'\0');
-        inet_ntop(rtnl_route_get_family(route),nl_addr_get_binary_addr(rtnl_route_get_dst(route)),(char*)dstaddr.c_str(),1024);
+        dstaddr.resize(INET6_ADDRSTRLEN,'\0');
+        inet_ntop(rtnl_route_get_family(route),nl_addr_get_binary_addr(rtnl_route_get_dst(route)),(char*)dstaddr.c_str(),dstaddr.capacity());
         dst_addr = true;
     }
 
     if ((rtnl_route_get_pref_src(route) != NULL) && (nl_addr_get_len(rtnl_route_get_pref_src(route)) > 0))
     {
-        prefsrc.resize(1024,'\0');
-        inet_ntop(rtnl_route_get_family(route),nl_addr_get_binary_addr(rtnl_route_get_pref_src(route)),(char*)prefsrc.c_str(),1024);
+        prefsrc.resize(INET6_ADDRSTRLEN,'\0');
+        inet_ntop(rtnl_route_get_family(route),nl_addr_get_binary_addr(rtnl_route_get_pref_src(route)),(char*)prefsrc.c_str(),prefsrc.capacity());
     }
 
     int priority = rtnl_route_get_priority(route);
@@ -1049,8 +1048,8 @@ void NetLinkIfc::processroute_rtnl(string action, struct rtnl_route* route)
     msgargs = std::to_string(rtnl_route_get_family(route));
     msgargs += "; ";
 
-    string ifname(1024,'\0');
-    rtnl_link_i2name(m_link_cache,oifindex,(char*)(ifname.c_str()),1024);
+    string ifname(IFNAMSIZ,'\0');
+    rtnl_link_i2name(m_link_cache,oifindex,(char*)(ifname.c_str()),ifname.capacity());
     msgargs += ifname + "; " + dstaddr + "; " + gwaddr + "; " + prefsrc + "; " + std::to_string(rtnl_route_get_priority(route)) +"; " +oper;
     msgargs.erase(std::remove_if(msgargs.begin(),msgargs.end(),[](char c) {
                                return !(isalnum(c) || (c == '/') || (c == ' ') || (c == ':') || (c == '-') || (c == '.') || (c == '@') || (c == '_') || (c == '[') || (c == ']') || (c == ';'));}),msgargs.end());
@@ -1063,6 +1062,7 @@ void NetLinkIfc::processroute_rtnl(string action, struct rtnl_route* route)
     }
 
     runStateMachine(event,msgargs);
+    cout<<"Exiting processroute_rtnl function"<<endl;
 }
 
 void NetLinkIfc::link_init_cb(struct nl_object *obj , void * arg)
@@ -1082,4 +1082,10 @@ void NetLinkIfc::route_init_cb(struct nl_object *obj , void * arg)
     NetLinkIfc* inst = reinterpret_cast<NetLinkIfc*>(arg);
     struct rtnl_route* route = reinterpret_cast<struct rtnl_route*>(obj);
     inst->processroute_rtnl("add",route);
+}
+
+void NetLinkIfc::updateCloneConfig(struct nl_cache* obj,struct nl_cache*& clone)
+{
+    nl_cache_free(clone);
+    clone = nl_cache_clone(obj);
 }

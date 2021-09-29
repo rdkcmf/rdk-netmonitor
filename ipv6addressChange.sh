@@ -33,6 +33,7 @@ if [ $mode == "ipv6" ]; then
      IPTABLE_CMD="/usr/sbin/ip6tables -w "
 fi
 
+(/bin/busybox kill -STOP $$; /bin/busybox kill -CONT $$)
 if [ "x$cmd" == "xadd" ] && [ "x$flags" == "xglobal" ]; then
    if [ ! -f /tmp/estb_ipv4 ] && [ ! -f /tmp/estb_ipv6 ];
    then

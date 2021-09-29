@@ -26,6 +26,7 @@ if [ $# -eq 0 ] || [ $# -ne 7 ];then
     exit;
 fi
 
+(/bin/busybox kill -STOP $$; /bin/busybox kill -CONT $$)
 echo "Input Arguments : $* "
 LOGFILE="/opt/logs/netsrvmgr.log"
 opern="$7"

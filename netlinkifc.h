@@ -34,6 +34,7 @@
 #include <linux/if.h>
 #include <arpa/inet.h>
 #include <vector>
+#include <set>
 #include <algorithm>
 #include "subscribers.h"
 extern "C" 
@@ -82,20 +83,40 @@ typedef struct iface_info
     std::string  m_if_macaddr;  // mac address
     unsigned int m_if_flags;    // SIOCGIFFLAGS
     std::string  m_if_name;     // interface name
+    iface_info() :
+        m_if_index(-1),
+        m_if_macaddr("NULL"),
+        m_if_flags(0),
+        m_if_name("NULL")
+    {
+    }
+    iface_info(const iface_info& lhs)
+    {
+        m_if_index = lhs.m_if_index;
+        m_if_macaddr = lhs.m_if_macaddr;
+        m_if_flags = lhs.m_if_flags;
+        m_if_name = lhs.m_if_name;
+    }
+
+    bool operator <(const iface_info& other) const
+    {
+        return (m_if_index < other.m_if_index);
+    }
+
+    bool operator ==(const iface_info& other) const
+    {
+        return (m_if_index == other.m_if_index);
+    }
+
 } iface_info;
 
-typedef struct ipaddr
+struct ifaceLessThan : public std::binary_function<iface_info, iface_info, bool>
 {
-   string address;
-   bool global;
-   unsigned int family;
-   unsigned short prefix;
-   
-   bool operator ==(const ipaddr& rhs)
-   {
-      return ((address == rhs.address) && (global == rhs.global) && (family == rhs.family) && (prefix == rhs.prefix));
-   }
-} ipaddr;
+    bool operator()(const iface_info& lhs, const iface_info& rhs) const
+    {
+        return !(lhs == rhs) && (lhs < rhs);
+    }
+};
 
 typedef struct default_route
 {
@@ -128,7 +149,6 @@ private:
         netifcState m_state;
         netifcEvent m_event;
 
-        multimap<int,ipaddr> m_ipAddrMap;
         NetLinkIfc ();
         void populateinterfacecompleted(string);
         void populateaddrescompleted(string);
@@ -146,12 +166,11 @@ private:
         void linkAdminDown(string);
         void addlink(string);
         void deletelink(string);
+        void updateCloneConfig(struct nl_cache* obj,struct nl_cache*& clone);
 	void processlink_rtnl(string action,struct rtnl_link* link);
 	void processaddr_rtnl(string action, struct rtnl_addr* addr);
 	void processroute_rtnl(string action, struct rtnl_route* addr);
         void tokenize(string& inputStr, vector<string>& tokens);
-        bool addipaddrentry(multimap<int,ipaddr>& mmap,int ifindex,ipaddr& addr);
-        bool deleteaddrentry(multimap<int,ipaddr>& mmap,int ifindex,ipaddr& addr);
         //void reinitialize(string);
         void publish(NlType type,string args);
 
@@ -174,6 +193,10 @@ private:
         struct nl_cache * m_link_cache; 
         struct nl_cache * m_route_cache;
         struct nl_cache * m_addr_cache;
+
+        struct nl_cache * m_link_clone; 
+        struct nl_cache * m_route_clone;
+        struct nl_cache * m_addr_clone;
         list<int> monitoredmsgtypes;
         list<Subscriber*> m_subscribers;
 public:
