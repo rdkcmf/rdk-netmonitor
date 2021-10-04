@@ -21,6 +21,10 @@
 #include <map>
 #include <unistd.h>
 
+#ifdef INCLUDE_BREAKPAD
+#include "breakpad_wrapper.h"
+#endif
+
 map<string,NlType> type_map =
 {
    {"address",NlType::address},
@@ -36,6 +40,10 @@ int main ()
 
     string nltype, scriptname;
     ifstream cfgFile("/etc/nlmon.cfg");
+
+#ifdef INCLUDE_BREAKPAD
+breakpad_ExceptionHandler();
+#endif
 
     while (cfgFile>>nltype>>scriptname)
     {

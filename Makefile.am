@@ -20,13 +20,15 @@
 AM_CXXFLAGS = -Wall -std=c++1y $(NL_CFLAGS) $(NLCLI_CFLAGS) $(DEBUG_CXXFLAGS)
 ACLOCAL_AMFLAGS = -I m4
 
+AM_CFLAGS =  $(BREAKPAD_CFLAGS)
+AM_CPPFLAGS =  $(BREAKPAD_CFLAGS)
 
 bin_PROGRAMS = nlmon
 
 lib_LTLIBRARIES = libnlmonitor.la
 
 libnlmonitor_la_SOURCES = netlinkifc.cpp
-libnlmonitor_la_LDFLAGS = $(NLCLI_LIBS) $(NL_LIBS) -lpthread 
+libnlmonitor_la_LDFLAGS = $(NLCLI_LIBS) $(NL_LIBS) -lpthread -lbreakpadwrapper 
 
 
 nlmon_SOURCES = main.cpp
