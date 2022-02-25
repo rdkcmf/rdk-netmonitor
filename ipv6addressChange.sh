@@ -125,3 +125,16 @@ if [ $ifc == "$WIFI_INTERFACE" ] || [ $ifc == "$MOCA_INTERFACE" ] || [ $ifc == "
        sh /lib/rdk/getDeviceDetails.sh 'refresh' 'all' &
    fi
 fi
+
+if [ $ifc == "$WIFI_INTERFACE" ] || [ $ifc == "$MOCA_INTERFACE" ] || [ $ifc == "${WIFI_INTERFACE}:0" ] || [ $ifc == "${MOCA_INTERFACE}:0" ]; then
+
+  if [ "x$flags" == "xglobal" ]; then
+       if [ ! -f /tmp/Dropbear_restart_disabled ]; then
+            echo "Restarting Dropbear due to global ip address changes" >> /opt/logs/dropbear.log
+            systemctl reset-failed dropbear.service
+            systemctl restart dropbear.service &
+       else
+            echo "Preventing Dropbear restarts" >> /opt/logs/dropbear.log
+       fi
+  fi
+fi
