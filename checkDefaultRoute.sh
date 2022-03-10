@@ -63,7 +63,7 @@ elif [ "$opern" = "delete" ]; then
     #Remove flag and IP for delete operation
     echo "Deleting Route Flag"
     sed -i "/$gtwip/d" $FILE
-    rm -rf /tmp/route_available
+    [ -s $FILE ] || rm -rf /tmp/route_available
 else
     echo "Received operation:$opern is Invalid..!!"
 fi
