@@ -73,7 +73,18 @@ if [ "x$cmd" == "xdelete" ] && [ "x$flags" == "xglobal" ]; then
      if [[ $addr == fd* ]] || [[ $addr == fc* ]]; then
        echo " It is ULA address, no need to clear IPv6 flags"
      else
-       globalip=`ip -6 a | grep global`
+         pd=`pwd`
+         cd /sys/class/net
+         globalip=""
+         for i in `ls`
+         do
+             if [ "$i" != "dobby0" ]; then
+                 lglobal=`/sbin/ip -6 addr show dev $i | grep global`
+             fi
+             globalip="$globalip $lglobal"
+         done
+         cd $pd
+
        if [ "x$globalip" = "x" ]; then
           echo " Box was previously in IPv6 mode and now in IPv4 mode. Clearing IPv6 flags for $ifc"
           rm -f  /tmp/estb_ipv6
@@ -81,7 +92,17 @@ if [ "x$cmd" == "xdelete" ] && [ "x$flags" == "xglobal" ]; then
        fi
      fi
    else
-       globalip=`ip -4 a | grep global`
+       pd=`pwd`
+       cd /sys/class/net
+       globalip=""
+       for i in `ls`
+       do
+           if [ "$i" != "dobby0" ]; then
+               lglobal=`/sbin/ip -4 addr show dev $i | grep global`
+           fi
+           globalip="$globalip $lglobal"
+       done
+       cd $pd
        if [ "x$globalip" = "x" ]; then
           echo " Box was previously in IPv4 mode and now in IPv6 mode. Clearing IPv4 flags for $ifc"
           rm -f /tmp/estb_ipv4
