@@ -120,6 +120,7 @@ if [ $ifc == "$WIFI_INTERFACE" ] || [ $ifc == "$MOCA_INTERFACE" ] || [ $ifc == "
    if [ "x$cmd" == "xadd" ] && [ "x$flags" == "xglobal" ]; then
      # Check for ESTB_INTERFACE from device.properties is matching with IP acquired interface.
      echo "Received global $mode address for $ifc interface, uptime is $uptime milliseconds"
+     touch "/tmp/${mode}_${flags}"
 
      $IPTABLE_CMD -I INPUT -s $addr -p tcp --dport 22 -j ACCEPT
      $IPTABLE_CMD -I OUTPUT -o lo -p tcp -s $addr -d $addr -j ACCEPT
@@ -130,6 +131,9 @@ if [ $ifc == "$WIFI_INTERFACE" ] || [ $ifc == "$MOCA_INTERFACE" ] || [ $ifc == "
    if [ "x$cmd" == "xdelete" ] && [ "x$flags" == "xglobal" ]; then
      $IPTABLE_CMD -D INPUT -s $addr -p tcp --dport 22 -j ACCEPT
      $IPTABLE_CMD -D OUTPUT -o lo -p tcp -s $addr -d $addr -j ACCEPT
+     if [ -f "/tmp/${mode}_${flags}" ]; then
+         rm -rf "/tmp/${mode}_${flags}"
+     fi
    fi
    
    if [ -d /opt/logs ] && [ $mode == "ipv6" ]; then

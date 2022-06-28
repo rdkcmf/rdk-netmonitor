@@ -49,30 +49,38 @@ if [ "$opern" = "add" ]; then
 	   touch /tmp/ipv4_route
 	   if [ ! -f /tmp/ipv6_mode ] && [ ! -f /tmp/ipv4_mode ];
 	   then
+               if [ -f /tmp/ipv4_global ]; then
 		   echo "Publishing ipmode change to ipv4" >> $LOGFILE
 		   /usr/bin/IARM_event_sender IpmodeEvent 1 ipv4
 		   touch /tmp/ipv4_mode
+               fi
 	   fi
    elif [ "x$lmode" = "xipv6" ]; then
 	   touch /tmp/ipv6_route
-	   echo "Publishing ipmode change to ipv6" >> $LOGFILE
-	   /usr/bin/IARM_event_sender IpmodeEvent 1 ipv6
-	   touch /tmp/ipv6_mode
+           if [ -f /tmp/ipv6_global ]; then
+               echo "Publishing ipmode change to ipv6" >> $LOGFILE
+               /usr/bin/IARM_event_sender IpmodeEvent 1 ipv6
+               touch /tmp/ipv6_mode
+           fi
    fi
 elif [ "$opern" = "delete" ]; then
     #Remove flag and IP for delete operation
     echo "Deleting Route Flag" >> $LOGFILE
     if [ "x$lmode" = "xipv6" ];
     then
-	   rm -f  /tmp/ipv6_mode
 	   rm -f  /tmp/ipv6_route
-	   if [ -f /tmp/ipv4_route ]; then
+           if [ ! -f /tmp/ipv6_global ]; then
+               rm -f  /tmp/ipv6_mode
+               if [ -f /tmp/ipv4_route ]; then
 		   echo "Publishing ipmode change to ipv4" >> $LOGFILE
 		   /usr/bin/IARM_event_sender IpmodeEvent 1 ipv4
 		   touch /tmp/ipv4_mode
+               fi
 	   fi
    elif [ "x$lmode" = "xipv4" ]; then
-	   rm -f /tmp/ipv4_mode
+           if [ ! -f /tmp/ipv4_global ]; then
+               rm -f /tmp/ipv4_mode
+           fi
 	   rm -f  /tmp/ipv4_route
    fi
 else
