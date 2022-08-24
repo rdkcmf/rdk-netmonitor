@@ -25,6 +25,10 @@
 #include "breakpad_wrapper.h"
 #endif
 
+#ifdef ENABLE_RDKLOGGER
+#include "rdk_debug.h"
+#endif
+
 map<string,NlType> type_map =
 {
    {"address",NlType::address},
@@ -36,6 +40,9 @@ map<string,NlType> type_map =
 
 int main ()
 {
+#ifdef ENABLE_RDKLOGGER
+    rdk_logger_init("/etc/debug.ini");
+#endif
     NetLinkIfc* netifc = NetLinkIfc::get_instance();
 
     string nltype, scriptname;

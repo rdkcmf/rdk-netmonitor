@@ -22,6 +22,11 @@
 #include <string>
 #include <iostream>
 #include <algorithm>
+
+#ifdef ENABLE_RDKLOGGER
+#include "rdk_debug.h"
+#endif
+
 enum class NlType { address, link, route, wifi, dfltroute, unknown };
 
 using namespace std;
@@ -47,13 +52,19 @@ public:
   void invoke(std::string args)
   {
       std::string cmd = script + " " +args;
+#ifdef ENABLE_RDKLOGGER
+      RDK_LOG( RDK_LOG_INFO,"LOG.RDK.NLMON","%s(%d):COMMAND = %s \n", __FILE__, __LINE__ ,cmd.c_str());
+#else
       std::cout<<"COMMAND = "<<cmd<<std::endl;
-
+#endif
       cmd.erase(std::remove_if(cmd.begin(),cmd.end(),[](char c) {
           return !(isalnum(c) || (c == '/') || (c == ' ') || (c == ':') || (c == '-') || (c == '.') || (c == '@') || (c == '_') || (c == '[') || (c == ']'));}),cmd.end());
 
+#ifdef ENABLE_RDKLOGGER
+      RDK_LOG( RDK_LOG_INFO,"LOG.RDK.NLMON","%s(%d):COMMAND After Sanitizing= %s \n", __FILE__, __LINE__ ,cmd.c_str());
+#else
       std::cout<<"COMMAND After Sanitizing  = "<<cmd<<std::endl;
-
+#endif
       system(cmd.c_str());
   }
 };
@@ -68,7 +79,11 @@ public:
   ~FunctionSubscriber() {}
   void invoke(std::string args)
   {
+#ifdef ENABLE_RDKLOGGER
+      RDK_LOG( RDK_LOG_INFO,"LOG.RDK.NLMON","%s(%d):ARGS = %s \n", __FILE__, __LINE__ ,args.c_str());
+#else
       std::cout<<"ARGS  = "<<args<<std::endl;
+#endif
       args.erase(std::remove_if(args.begin(),args.end(),[](char c) {
           return !(isalnum(c) || (c == '/') || (c == ' ') || (c == ':') || (c == '-') || (c == '.') || (c == '@') || (c == '_') || (c == '[') || (c == ']'));}),args.end());
       m_funcPtr(args);

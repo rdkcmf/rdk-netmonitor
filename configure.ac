@@ -41,6 +41,9 @@ AM_PROG_LIBTOOL(libtool)
 BREAKPAD_CFLAGS=" "
 BREAKPAD_LFLAGS=" "
 
+RDKLOGGER_CFLAGS=" "
+RDKLOGGER_LFLAGS=" "
+
 # Checks for header files.
 AC_CHECK_HEADERS([stdlib.h string.h unistd.h])
 PKG_CHECK_MODULES([NL], [libnl-3.0 >= 3.2.22])
@@ -67,18 +70,34 @@ AC_ARG_ENABLE([debug],
          [echo "headless build is enable"])
 
 AC_ARG_ENABLE([breakpad],
-		AS_HELP_STRING([--enable-breakpad],[enable breakpad support (default is no)]),
-		[
-			case "${enableval}" in
-		yes) BREAKPAD_CFLAGS="-DINCLUDE_BREAKPAD"
+        AS_HELP_STRING([--enable-breakpad],[enable breakpad support (default is no)]),
+        [
+            case "${enableval}" in
+        yes) BREAKPAD_CFLAGS="-DINCLUDE_BREAKPAD"
                     BREAKPAD_LFLAGS="-lbreakpad_client";;
-		no) AC_MSG_ERROR([breakpad is disabled]) ;;
-		*) AC_MSG_ERROR([bad value ${enableval} for --enable-breakpad]) ;;
-		esac
-		],
-		[echo "breakpad is disabled"])
+        no) AC_MSG_ERROR([breakpad is disabled]) ;;
+        *) AC_MSG_ERROR([bad value ${enableval} for --enable-breakpad]) ;;
+        esac
+        ],
+        [echo "breakpad is disabled"])
+
+AC_ARG_ENABLE([rdklogger],
+        AS_HELP_STRING([--enable-rdklogger],[This will enable/disable rdklogger.]),
+        [
+            case "${enableval}" in
+                yes) RDKLOGGER_CFLAGS="-DENABLE_RDKLOGGER"
+                    RDKLOGGER_LFLAGS="-lrdkloggers -llog4c";;
+                no) RDKLOGGER_CFLAGS=" "
+                RDKLOGGER_LFLAGS=" ";;
+                *) AC_MSG_ERROR([bad value ${enableval} for --enable-rdklogger ]) ;;
+            esac
+        ],
+        [echo "rdklogger is disable"])
+
 AC_SUBST(BREAKPAD_CFLAGS)
 AC_SUBST(BREAKPAD_LFLAGS)
+AC_SUBST(RDKLOGGER_CFLAGS)
+AC_SUBST(RDKLOGGER_LFLAGS)
 
 AC_CONFIG_FILES(Makefile)
 AC_SUBST(DEBUG_CXXFLAGS)

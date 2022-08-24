@@ -28,7 +28,7 @@ bin_PROGRAMS = nlmon
 lib_LTLIBRARIES = libnlmonitor.la
 
 libnlmonitor_la_SOURCES = netlinkifc.cpp
-libnlmonitor_la_LDFLAGS = $(NLCLI_LIBS) $(NL_LIBS) -lpthread -lbreakpadwrapper 
+libnlmonitor_la_LDFLAGS = $(NLCLI_LIBS) $(NL_LIBS) -lpthread -lbreakpadwrapper
 
 
 nlmon_SOURCES = main.cpp

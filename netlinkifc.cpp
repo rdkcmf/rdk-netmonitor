@@ -26,6 +26,9 @@
 #include <sys/types.h>
 #include <unistd.h>
 #include <linux/if_arp.h>
+#ifdef ENABLE_RDKLOGGER
+#include "rdk_debug.h"
+#endif
 
 
 NetLinkIfc* NetLinkIfc::pInstance = NULL;
@@ -41,7 +44,11 @@ NetLinkIfc* NetLinkIfc::get_instance()
         {
            pInstance = new NetLinkIfc;
 #ifdef _DEBUG_
+#ifdef ENABLE_RDKLOGGER
+           RDK_LOG( RDK_LOG_INFO,"LOG.RDK.NLMON","%s(%d): CREATED NEW INSTANCE \n", __FILE__, __LINE__ );
+#else
            cout<<"CREATED NEW INSTANCE"<<endl;
+#endif
 #endif
         }
     }
@@ -56,7 +63,11 @@ NetLinkIfc::NetLinkIfc ():m_state(eNETIFC_STATE_INIT),m_event(eNETIFC_EVENT_UNKN
     if (nl_cache_mngr_alloc(NULL,NETLINK_ROUTE,0,&m_cachemgr) != 0)
     {
        //throw exception.For now print error.
+#ifdef ENABLE_RDKLOGGER
+       RDK_LOG( RDK_LOG_ERROR,"LOG.RDK.NLMON","%s(%d):Error Allocating cacheManager \n", __FILE__, __LINE__ );
+#else
        printf("Error Allocating cacheManager\n");
+#endif
        m_cachemgr = NULL;
     }
     m_clisocketId = nl_cli_alloc_socket();
@@ -107,19 +118,30 @@ void NetLinkIfc::initialize()
     int err = nl_cache_mngr_add(m_cachemgr, "route/link", &NetLinkIfc::link_change_cb, this,&m_link_cache);
     if (err < 0)
     {
+#ifdef ENABLE_RDKLOGGER
+       RDK_LOG( RDK_LOG_ERROR,"LOG.RDK.NLMON","%s(%d): Error Adding route/link cache \n", __FILE__, __LINE__);
+#else
        printf("Error Adding route/link cache\n");
+#endif
     }
-
     err = nl_cache_mngr_add(m_cachemgr, "route/route", &NetLinkIfc::route_change_cb, this,&m_route_cache);
     if (err < 0)
     {
+#ifdef ENABLE_RDKLOGGER
+       RDK_LOG( RDK_LOG_ERROR,"LOG.RDK.NLMON","%s(%d): Error Adding route/route cache \n", __FILE__, __LINE__);
+#else
        printf("Error Adding route/route cache\n");
+#endif
     }
 
     err = nl_cache_mngr_add(m_cachemgr, "route/addr", &NetLinkIfc::addr_change_cb, this,&m_addr_cache);
     if (err < 0)
     {
+#ifdef ENABLE_RDKLOGGER
+       RDK_LOG( RDK_LOG_ERROR,"LOG.RDK.NLMON","%s(%d): Error Adding route/addr cache \n", __FILE__, __LINE__);
+#else
        printf("Error Adding route/addr cache\n");
+#endif
     }
 
     m_state = eNETIFC_STATE_POPULATE_IFC;
@@ -170,7 +192,6 @@ void NetLinkIfc::run(bool forever)
 void NetLinkIfc::tokenize(string& inputStr, vector<string>& tokens)
 {
    std::size_t start = inputStr.find_first_not_of(";"), end = start;
-    
    while (start != string::npos)
    {
       end = inputStr.find(";",start);
@@ -178,8 +199,6 @@ void NetLinkIfc::tokenize(string& inputStr, vector<string>& tokens)
       start = inputStr.find_first_not_of(";",end);
    }
 }
-
-
 
 void NetLinkIfc::publish(NlType type,string args)
 {
@@ -245,16 +264,30 @@ void NetLinkIfc::addipaddr(string str)
 
    if (tokens.size() < 3)
    {
-       cout<<"ADD IPV4 ADRESS: Ignoring Message due to Improper formatting. Incoming string: "<<str.c_str()<<endl;
-       return;
+#ifdef ENABLE_RDKLOGGER
+        RDK_LOG( RDK_LOG_INFO,"LOG.RDK.NLMON","%s(%d):ADD IPV4 ADRESS: Ignoring Message due to Improper formatting.\\
+                  Incoming string: %s \n", __FILE__, __LINE__,str.c_str());
+#else
+        cout<<"ADD IPV4 ADRESS: Ignoring Message due to Improper formatting. Incoming string: "<<str.c_str()<<endl;
+#endif
+    return;
    }
 #ifdef _DEBUG_
-   cout<<"ADD IPV4 ADRESS ;INTERFACE NAME = "<<tokens[0]<<"   address="<<tokens[1]<<" FLAGS = "<<tokens[2]<<endl;
+#ifdef ENABLE_RDKLOGGER
+    RDK_LOG( RDK_LOG_INFO,"LOG.RDK.NLMON","%s(%d):ADD IPV4 ADRESS ;INTERFACE NAME = %s    address= %s  FLAGS = %s \n",__FILE__,\\
+              __LINE__,tokens[0].c_str(),tokens[1].c_str(),tokens[2].c_str());
+#else
+    cout<<"ADD IPV4 ADRESS ;INTERFACE NAME = "<<tokens[0]<<"   address="<<tokens[1]<<" FLAGS = "<<tokens[2]<<endl;
+#endif
 #endif
    string msgArgs = "add ipv4 ";
    msgArgs += tokens[0] + " " + tokens[1] + " " + tokens[2];
 #ifdef _DEBUG_
+#ifdef ENABLE_RDKLOGGER
+   RDK_LOG( RDK_LOG_INFO,"LOG.RDK.NLMON","%s(%d): MSGARGS = %s  \n", __FILE__, __LINE__ ,msgArgs.c_str());
+#else
    cout<<"MSGARGS = "<<msgArgs<<endl;
+#endif
 #endif
    publish(NlType::address,msgArgs);
 }
@@ -266,17 +299,30 @@ void NetLinkIfc::deleteipaddr(string str)
 
    if (tokens.size() < 3)
    {
+#ifdef ENABLE_RDKLOGGER
+       RDK_LOG( RDK_LOG_INFO,"LOG.RDK.NLMON","%s(%d): DELETE IPV4 ADRESS: Ignoring Message due to Improper formatting.\\
+                  Incoming string:%s \n", __FILE__, __LINE__ ,str.c_str());
+#else
        cout<<"DELETE IPV4 ADRESS: Ignoring Message due to Improper formatting. Incoming string: "<<str.c_str()<<endl;
+#endif
        return;
    }
 #ifdef _DEBUG_
-   cout<<"DELETE IPV4 ADRESS ;INTERFACE NAME = "<<tokens[0]<<"   address="<<tokens[1]<<" FLAGS = "<<tokens[2]<<endl;
+#ifdef ENABLE_RDKLOGGER
+      RDK_LOG( RDK_LOG_INFO,"LOG.RDK.NLMON","%s(%d): DELETE IPV4 ADRESS ;INTERFACE NAME = %s  address = %s  FLAGS = %s  \n",\\
+                 __FILE__, __LINE__,tokens[0].c_str(),tokens[1].c_str(),tokens[2].c_str());
+#else
+      cout<<"DELETE IPV4 ADRESS ;INTERFACE NAME = "<<tokens[0]<<"   address="<<tokens[1]<<" FLAGS = "<<tokens[2]<<endl;
 #endif
-
+#endif
    string msgArgs = "delete ipv4 ";
    msgArgs += tokens[0] + " " + tokens[1] + " " + tokens[2];
 #ifdef _DEBUG_
-   cout<<"MSGARGS = "<<msgArgs<<endl;
+#ifdef ENABLE_RDKLOGGER
+    RDK_LOG( RDK_LOG_INFO,"LOG.RDK.NLMON","%s(%d): MSGARGS = %s  \n", __FILE__, __LINE__ ,msgArgs.c_str());
+#else
+    cout<<"MSGARGS = "<<msgArgs<<endl;
+#endif
 #endif
    publish(NlType::address,msgArgs);
 }
@@ -289,17 +335,30 @@ void NetLinkIfc::addip6addr(string str )
 
    if (tokens.size() < 3)
    {
+#ifdef ENABLE_RDKLOGGER
+       RDK_LOG( RDK_LOG_WARN,"LOG.RDK.NLMON","%s(%d): ADD IPV6 ADRESS: Ignoring Message due to Improper formatting.\\
+                  Incoming string:%s \n", __FILE__, __LINE__,str.c_str());
+#else
        cout<<"ADD IPV6 ADRESS: Ignoring Message due to Improper formatting. Incoming string: "<<str.c_str()<<endl;
-       return;
+#endif
+   return;
    }
 #ifdef _DEBUG_
+#ifdef ENABLE_RDKLOGGER
+   RDK_LOG( RDK_LOG_INFO,"LOG.RDK.NLMON","%s(%d): ADD IPV4 ADRESS ;INTERFACE NAME = %s  address = %s  FLAGS = %s  \n",\\
+             __FILE__, __LINE__,tokens[0].c_str(),tokens[1].c_str(),tokens[2].c_str());
+#else
    cout<<"ADD IPV6 ADRESS ;INTERFACE NAME = "<<tokens[0]<<"   address="<<tokens[1]<<" FLAGS = "<<tokens[2]<<endl;
 #endif
-
+#endif
    string msgArgs = "add ipv6 ";
    msgArgs += tokens[0] + " " + tokens[1] + " " + tokens[2];
 #ifdef _DEBUG_
+#ifdef ENABLE_RDKLOGGER
+    RDK_LOG( RDK_LOG_INFO,"LOG.RDK.NLMON","%s(%d): MSGARGS = %s  \n", __FILE__, __LINE__ ,msgArgs.c_str());
+#else
    cout<<"MSGARGS = "<<msgArgs<<endl;
+#endif
 #endif
    publish(NlType::address,msgArgs);
 }
@@ -311,17 +370,30 @@ void NetLinkIfc::deleteip6addr(string str)
 
    if (tokens.size() < 3)
    {
+#ifdef ENABLE_RDKLOGGER
+       RDK_LOG( RDK_LOG_INFO,"LOG.RDK.NLMON","%s(%d): DELETE IPV6 ADRESS: Ignoring Message due to Improper formatting.\\
+                 Incoming string: %s \n", __FILE__, __LINE__,str.c_str());
+#else
        cout<<"DELETE IPV6 ADRESS: Ignoring Message due to Improper formatting. Incoming string: "<<str.c_str()<<endl;
+#endif
        return;
    }
 #ifdef _DEBUG_
-   cout<<"DELETE IPV6 ADRESS ;INTERFACE NAME = "<<tokens[0]<<"   address="<<tokens[1]<<" FLAGS = "<<tokens[2]<<endl;
+#ifdef ENABLE_RDKLOGGER
+    RDK_LOG( RDK_LOG_INFO,"LOG.RDK.NLMON","%s(%d): DELETE IPV6 ADRESS ;INTERFACE NAME = %s  address = %s  FLAGS = %s  \n",\\
+              __FILE__, __LINE__,tokens[0].c_str(),tokens[1].c_str(),tokens[2].c_str());
+#else
+    cout<<"DELETE IPV6 ADRESS ;INTERFACE NAME = "<<tokens[0]<<"   address="<<tokens[1]<<" FLAGS = "<<tokens[2]<<endl;
 #endif
-
+#endif
    string msgArgs = "delete ipv6 ";
    msgArgs += tokens[0] + " " + tokens[1] + " " + tokens[2];
 #ifdef _DEBUG_
-   cout<<"MSGARGS = "<<msgArgs<<endl;
+#ifdef ENABLE_RDKLOGGER
+    RDK_LOG( RDK_LOG_INFO,"LOG.RDK.NLMON","%s(%d): MSGARGS = %s  \n", __FILE__, __LINE__ ,msgArgs.c_str());
+#else
+    cout<<"MSGARGS = "<<msgArgs<<endl;
+#endif
 #endif
    publish(NlType::address,msgArgs);
 }
@@ -331,7 +403,11 @@ void NetLinkIfc::populateinterfacecompleted(string str)
 {
    std::lock_guard<std::recursive_mutex> guard(g_state_mutex);
 #ifdef _DEBUG_
+#ifdef ENABLE_RDKLOGGER
+   RDK_LOG( RDK_LOG_INFO,"LOG.RDK.NLMON","%s(%d): INSIDE COMPLETED INTERFACE POPULATION; Received: %s\n", __FILE__, __LINE__ ,str.c_str());
+#else
    cout<<"INSIDE COMPLETED INTERFACE POPULATION; Received: "<<str<<endl;
+#endif
 #endif
    m_state = eNETIFC_STATE_POPULATE_ADDRESS;
 }
@@ -339,7 +415,11 @@ void NetLinkIfc::populateaddrescompleted(string str)
 {
    std::lock_guard<std::recursive_mutex> guard(g_state_mutex);
 #ifdef _DEBUG_
+#ifdef ENABLE_RDKLOGGER
+   RDK_LOG( RDK_LOG_INFO,"LOG.RDK.NLMON","%s(%d): INSIDE COMPLETED ADDRESS POPULATION; Received: %s\n", __FILE__, __LINE__ ,str.c_str());
+#else
    cout<<"INSIDE COMPLETED ADDRESS POPULATION; Received: "<<str<<endl;
+#endif
 #endif
    m_state = eNETIFC_STATE_RUNNING;
 }
@@ -348,9 +428,12 @@ void NetLinkIfc::addiproute(string str)
 {
    std::lock_guard<std::recursive_mutex> guard(g_state_mutex);
 #ifdef _DEBUG_
+#ifdef ENABLE_RDKLOGGER
+   RDK_LOG( RDK_LOG_INFO,"LOG.RDK.NLMON","%s(%d): INSIDE ADDIPROUTE; Received: %s\n", __FILE__, __LINE__ ,str.c_str());
+#else
    cout<<"INSIDE ADDIPROUTE; Received: "<<str<<endl;
 #endif
-
+#endif
    string msgArgs = "add ipv4 ";
    msgArgs += str;
    publish(NlType::route,msgArgs);
@@ -360,7 +443,11 @@ void NetLinkIfc::addip6route(string str)
 {
    std::lock_guard<std::recursive_mutex> guard(g_state_mutex);
 #ifdef _DEBUG_
+#ifdef ENABLE_RDKLOGGER
+   RDK_LOG( RDK_LOG_INFO,"LOG.RDK.NLMON","%s(%d): INSIDE ADDIP6ROUTE; Received: %s\n", __FILE__, __LINE__ ,str_c.str());
+#else
    cout<<"INSIDE ADDIP6ROUTE; Received: "<<str<<endl;
+#endif
 #endif
 
    string msgArgs = "add ipv6 ";
@@ -372,7 +459,11 @@ void NetLinkIfc::deleteiproute(string str)
 {
    std::lock_guard<std::recursive_mutex> guard(g_state_mutex);
 #ifdef _DEBUG_
+#ifdef ENABLE_RDKLOGGER
+   RDK_LOG( RDK_LOG_INFO,"LOG.RDK.NLMON","%s(%d): INSIDE DELETEIPROUTE; Received: %s\n", __FILE__, __LINE__ ,str_c.str());
+#else
    cout<<"INSIDE DELETEIPROUTE; Received: "<<str<<endl;
+#endif
 #endif
 
    string msgArgs = "delete ipv4 ";
@@ -384,7 +475,11 @@ void NetLinkIfc::deleteip6route(string str)
 {
    std::lock_guard<std::recursive_mutex> guard(g_state_mutex);
 #ifdef _DEBUG_
+#ifdef ENABLE_RDKLOGGER
+   RDK_LOG( RDK_LOG_INFO,"LOG.RDK.NLMON","%s(%d): INSIDE DELETEIP6ROUTE; Received: %s\n", __FILE__, __LINE__ ,str.c_str());
+#else
    cout<<"INSIDE DELETEIP6ROUTE; Received: "<<str<<endl;
+#endif
 #endif
 
    string msgArgs = "delete ipv6 ";
@@ -400,7 +495,11 @@ void NetLinkIfc::cacheMgrMsg(NetLinkIfc* instance)
       int err = nl_cache_mngr_poll(instance->m_cachemgr, -1);
       if (err < 0)
       {
-         cout<<"Poll Request Failed"<<endl;
+#ifdef ENABLE_RDKLOGGER
+        RDK_LOG( RDK_LOG_ERROR,"LOG.RDK.NLMON","%s(%d): Poll Request Failed \n", __FILE__, __LINE__ );
+#else
+        cout<<"Poll Request Failed"<<endl;
+#endif
       }
    }
 }
@@ -412,7 +511,11 @@ void NetLinkIfc::deleteinterfaceip(string ifc, unsigned int family)
 
    if ((m_link_clone == NULL) || (m_addr_clone == NULL))
    {
-      cout <<"NetLinkIfc::deleteinterfaceip: Cache is not populated yet. Returning"<<endl;
+#ifdef ENABLE_RDKLOGGER
+       RDK_LOG( RDK_LOG_ERROR,"LOG.RDK.NLMON","%s(%d): NetLinkIfc::deleteinterfaceip: Cache is not populated yet. Returning\n", __FILE__, __LINE__ );
+#else
+       cout <<"NetLinkIfc::deleteinterfaceip: Cache is not populated yet. Returning"<<endl;
+#endif
       return;
    }
    addr = nl_cli_addr_alloc();
@@ -420,13 +523,17 @@ void NetLinkIfc::deleteinterfaceip(string ifc, unsigned int family)
    int ifindex = 0;
 
    //1. populate index.
+
    if (!(ifindex = rtnl_link_name2i(m_link_clone, ifc.c_str())))
    {
-      cout <<ENOENT<<" Link "<<ifc<<" does not exist"<<endl;
-      return;
+#ifdef ENABLE_RDKLOGGER
+        RDK_LOG( RDK_LOG_ERROR,"LOG.RDK.NLMON","%s(%d):%s Link = %s  does mot exist \n", __FILE__, __LINE__ ,strerror(ENOENT),ifc.c_str());
+#else
+        cout <<ENOENT<<" Link "<<ifc<<" does not exist"<<endl;
+        return;
+#endif
    }
    rtnl_addr_set_ifindex(addr, ifindex);
-   
    //2. Set Family.
    rtnl_addr_set_family(addr, family);
 
@@ -440,13 +547,21 @@ void delete_addr_cb(struct nl_object *obj, void *arg)
 {
    struct rtnl_addr *addr = (struct rtnl_addr*)nl_object_priv(obj);
 #ifdef _DEBUG_
-   cout<<"TRYING TO DELETE ADDRESS"<<endl;
+#ifdef ENABLE_RDKLOGGER
+    RDK_LOG(RDK_LOG_INFO, "LOG.RDK.NLMON", "%s(%d):TRYING TO DELETE ADDRESS \n", __FILE__, __LINE__);
+#else
+    cout<<"TRYING TO DELETE ADDRESS"<<endl;
+#endif
 #endif
    int err;
    if ((err = rtnl_addr_delete((struct nl_sock *)arg, addr, 0)) < 0)
    {
 #ifdef _DEBUG_
-      cout <<"Unable to delete address: "<<nl_geterror(err)<<endl;
+#ifdef ENABLE_RDKLOGGER
+    RDK_LOG(RDK_LOG_ERROR, "LOG.RDK.NLMON:", "%s(%d):Unable to delete address: %s \n", __FILE__, __LINE__,nl_geterror(err));
+#else
+    cout <<"Unable to delete address: "<<nl_geterror(err)<<endl;
+#endif
 #endif
    }
 }
@@ -457,7 +572,12 @@ void NetLinkIfc::deleteinterfaceroutes(string ifc, unsigned int family)
 
    if ((m_link_clone == NULL) || (m_route_clone == NULL))
    {
+#ifdef ENABLE_RDKLOGGER
+       RDK_LOG(RDK_LOG_INFO, "LOG.RDK.NLMON", "%s(%d):NetLinkIfc::deleteinterfaceroutes: Route Cache or Link Cache\\
+                is not Populated. Returning \n", __FILE__, __LINE__);
+#else
        cout<<"NetLinkIfc::deleteinterfaceroutes: Route Cache or Link Cache is not Populated. Returning"<<endl;
+#endif
        return;
    }
    struct rtnl_route *route;
@@ -471,7 +591,11 @@ void NetLinkIfc::deleteinterfaceroutes(string ifc, unsigned int family)
    if (!(ifindex = rtnl_link_name2i(m_link_clone, ifc.c_str())))
    {
 #ifdef _DEBUG_
+#ifdef ENABLE_RDKLOGGER
+      RDK_LOG( RDK_LOG_ERROR,"LOG.RDK.NLMON","%s(%d):%s  Link = %s  does mot exist \n", __FILE__, __LINE__ ,strerror(ENOENT),ifc.c_str());
+#else
       cout <<ENOENT<<" Link "<<ifc<<" does not exist"<<endl;
+#endif
 #endif
       return;
    }
@@ -492,20 +616,32 @@ void NetLinkIfc::deleteinterfaceroutes(string ifc, unsigned int family)
 void delete_route_cb(struct nl_object *obj, void *arg)
 {
 #ifdef _DEBUG_
+#ifdef ENABLE_RDKLOGGER
+   RDK_LOG(RDK_LOG_INFO, "LOG.RDK.NLMON", "%s(%d):TRYING TO DELETE ROUTE \n", __FILE__, __LINE__);
+#else
    cout<<"TRYING TO DELETE ROUTE"<<endl;
+#endif
 #endif
    struct rtnl_route *route = (struct rtnl_route*)nl_object_priv(obj);
    int err;
    if ((err = rtnl_route_delete((struct nl_sock *)arg, route, 0)) < 0)
    {
-#ifdef _DEBUG_
-      cout <<"Unable to delete route: "<<nl_geterror(err)<<endl;
+#ifdef _DEBUG
+#ifdef ENABLE_RDKLOGGER
+   RDK_LOG(RDK_LOG_ERROR, "LOG.RDK.NLMON", "%s(%d):Unable to delete route:%s \n", __FILE__, __LINE__,nl_geterror(err));
+#else
+   cout <<"Unable to delete route: "<<nl_geterror(err)<<endl;
+#endif
 #endif
    }
    else
    {
 #ifdef _DEBUG_
+#ifdef ENABLE_RDKLOGGER
+      RDK_LOG(RDK_LOG_INFO, "LOG.RDK.NLMON", "%s(%d):SUCCESSFULLY DELETED ROUTE \n", __FILE__, __LINE__);
+#else
       cout<<"SUCCESSFULLY DELETED ROUTE"<<endl;
+#endif
 #endif
    }
 }
@@ -516,8 +652,12 @@ void NetLinkIfc::activatelink(string ifc)
 
    if (m_link_clone == NULL)
    {
-       cout<<"NetLinkIfc::activatelink: Link Cache is not populated. Returning"<<endl;
-       return;
+#ifdef ENABLE_RDKLOGGER
+      RDK_LOG(RDK_LOG_INFO, "LOG.RDK.NLMON", "%s(%d):NetLinkIfc::activatelink: Link Cache is not populated. Returning \n", __FILE__, __LINE__);
+#else
+      cout<<"NetLinkIfc::activatelink: Link Cache is not populated. Returning"<<endl;
+#endif
+      return;
    }
 
    struct rtnl_link *link, *up, *down;
@@ -547,13 +687,21 @@ void modify_link_cb(struct nl_object *obj, void *arg)
    if ((err = rtnl_link_change(linkArg->socketId, link, (struct rtnl_link *)linkArg->linkInfo, 0)) < 0)
    {
 #ifdef _DEBUG_
+#ifdef ENABLE_RDKLOGGER
+      RDK_LOG(RDK_LOG_ERROR, "LOG.RDK.NLMON", "%s(%d):Unable to change link: %s \n", __FILE__, __LINE__,nl_geterror(err));
+#else
       cout <<"Unable to change link: "<<nl_geterror(err)<<endl;
+#endif
 #endif
    }
    else
    {
 #ifdef _DEBUG_
+#ifdef ENABLE_RDKLOGGER
+      RDK_LOG(RDK_LOG_INFO, "LOG.RDK.NLMON", "%s(%d):LINK INFO SUCCESSFULLY CHANGED\n", __FILE__, __LINE__);
+#else
       cout<<"LINK INFO SUCCESSFULLY CHANGED"<<endl;
+#endif
 #endif
    }
 }
@@ -564,37 +712,65 @@ bool NetLinkIfc::getIpaddr(string ifc,unsigned int family,vector<string>& ipaddr
     std::lock_guard<std::recursive_mutex> guard(g_state_mutex);
     if ((m_link_clone == NULL) || (m_addr_clone == NULL))
     {
+#ifdef ENABLE_RDKLOGGER
+        RDK_LOG(RDK_LOG_ERROR, "LOG.RDK.NLMON", "%s(%d):NetLinkIfc::getIpaddr : Link or Address cache is not populated\n", __FILE__, __LINE__);
+#else
         cout<<"NetLinkIfc::getIpaddr : Link or Address cache is not populated"<<endl;
+#endif
         return false;
     }
     if (ifc.empty())
     {
+#ifdef ENABLE_RDKLOGGER
+        RDK_LOG(RDK_LOG_ERROR, "LOG.RDK.NLMON", "%s(%d):NetLinkIfc::getIpaddr : no interface name\n", __FILE__, __LINE__);
+#else
         cout<<"NetLinkIfc::getIpaddr : no interface name"<<endl;
+#endif
         return false;
     }
     else
     {
+#ifdef ENABLE_RDKLOGGER
+        RDK_LOG(RDK_LOG_INFO, "LOG.RDK.NLMON", "%s(%d):Interface %s \n", __FILE__, __LINE__,ifc.c_str());
+#else
         cout <<" Interface "<<ifc<<endl;
+#endif
     }
     if((family != AF_INET) && (family != AF_INET6))
     {
+#ifdef ENABLE_RDKLOGGER
+        RDK_LOG(RDK_LOG_ERROR, "LOG.RDK.NLMON", "%s(%d):NetLinkIfc::getIpaddr : wrong address family %u \n", __FILE__, __LINE__,family);
+#else
         cout<<"NetLinkIfc::getIpaddr : wrong address family "<< family <<endl;
+#endif
         return false;
     }
     if (!(ifindex = rtnl_link_name2i(m_link_clone, ifc.c_str())))
     {
+#ifdef ENABLE_RDKLOGGER
+        RDK_LOG( RDK_LOG_ERROR,"LOG.RDK.NLMON","%s(%d):%s Link = %s  does mot exist \n", __FILE__, __LINE__ ,strerror(ENOENT),ifc.c_str());
+#else
         cout <<ENOENT<<" Link "<<ifc<<" does not exist"<<endl;
+#endif
         return false;
     }
     else
     {
+#ifdef ENABLE_RDKLOGGER
+        RDK_LOG( RDK_LOG_INFO,"LOG.RDK.NLMON","%s(%d):interface index is %d \n", __FILE__, __LINE__ ,ifindex);
+#else
         cout <<"interface index is " <<ifindex <<endl;
+#endif
     }
     struct rtnl_addr *rtnlAddr = nl_cli_addr_alloc();
     if(!rtnlAddr)
     {
-        cout<<"NetLinkIfc::getIpaddr : rtnl_addr NULL " <<endl;
-        return false;
+#ifdef ENABLE_RDKLOGGER
+     RDK_LOG( RDK_LOG_INFO,"LOG.RDK.NLMON","%s(%d):NetLinkIfc::getIpaddr : rtnl_addr NULL\n", __FILE__, __LINE__);
+#else
+     cout<<"NetLinkIfc::getIpaddr : rtnl_addr NULL " <<endl;
+#endif
+     return false;
     }
     rtnl_addr_set_ifindex(rtnlAddr, ifindex);
     rtnl_addr_set_family(rtnlAddr, family);
@@ -615,23 +791,39 @@ void get_ip_addr_cb(struct nl_object *obj, void *arg)
         struct nl_addr *addr = rtnl_addr_get_local((struct rtnl_addr *) obj);
         if (NULL == addr)
         {
-            cout<<"NetLinkIfc::getIpaddr :failed to get rtnl local address"<<endl;
+#ifdef ENABLE_RDKLOGGER
+        RDK_LOG( RDK_LOG_ERROR,"LOG.RDK.NLMON","%s(%d):NetLinkIfc::getIpaddr :failed to get rtnl local address\n", __FILE__, __LINE__);
+#else
+        cout<<"NetLinkIfc::getIpaddr :failed to get rtnl local address"<<endl;
+#endif
         }
         ipBuffer = nl_addr2str(addr,ipBuffer,INET6_ADDRSTRLEN);
         if (NULL == ipBuffer)
         {
-            cout<<"NetLinkIfc::getIpaddr :failed in nl_addr2str"<<endl;
+#ifdef ENABLE_RDKLOGGER
+       RDK_LOG( RDK_LOG_ERROR,"LOG.RDK.NLMON","%s(%d):NetLinkIfc::getIpaddr :failed in nl_addr2str\n", __FILE__, __LINE__);
+#else
+       cout<<"NetLinkIfc::getIpaddr :failed in nl_addr2str"<<endl;
+#endif
         }
         else
         {
             ptrIpAddr->push_back(ipBuffer);
-            cout << "ip address is "<<ipBuffer<<endl;
+#ifdef ENABLE_RDKLOGGER
+        RDK_LOG( RDK_LOG_INFO,"LOG.RDK.NLMON","%s(%d):ip address is %s\n", __FILE__, __LINE__,ipBuffer);
+#else
+        cout << "ip address is "<<ipBuffer<<endl;
+#endif
         }
         free(ipBuffer);
     }
     else
     {
-        cout << "NetLinkIfc:get_ip_addr_cb Malloc Allocation error "<<endl;
+#ifdef ENABLE_RDKLOGGER
+        RDK_LOG( RDK_LOG_ERROR,"LOG.RDK.NLMON","%s(%d):NetLinkIfc:get_ip_addr_cb Malloc Allocation error\n", __FILE__, __LINE__);
+#else
+        cout <<"NetLinkIfc:get_ip_addr_cb Malloc Allocation error "<<endl;
+#endif
     }
 }
 
@@ -640,7 +832,11 @@ void NetLinkIfc::getInterfaces (std::vector<iface_info> &interfaces)
    std::lock_guard<std::recursive_mutex> guard(g_state_mutex);
    if (m_link_clone == NULL)
    {
+#ifdef ENABLE_RDKLOGGER
+       RDK_LOG( RDK_LOG_ERROR,"LOG.RDK.NLMON","%s(%d):NetLinkIfc::getInterfaces: Link Cache is not updated yet. Returning\n", __FILE__, __LINE__);
+#else
        cout<<"NetLinkIfc::getInterfaces: Link Cache is not updated yet. Returning"<<endl;
+#endif
        return;
    }
    std::set<iface_info,ifaceLessThan> ifset;
@@ -684,7 +880,11 @@ bool NetLinkIfc::getDefaultRoute(bool is_ipv6, string& interface, string& gatewa
 
     if ((m_link_clone == NULL) || (m_route_clone == NULL))
     {
+#ifdef ENABLE_RDKLOGGER
+        RDK_LOG( RDK_LOG_ERROR,"LOG.RDK.NLMON","%s(%d):NetLinkIfc::getDefaultRoute: Link cache or route Cache is empty. Returning.\n", __FILE__, __LINE__);
+#else
         cout<<"NetLinkIfc::getDefaultRoute: Link cache or route Cache is empty. Returning."<<endl;
+#endif
         return false;
     }
     if (nl_cache_is_empty(m_route_clone))
@@ -746,7 +946,12 @@ void get_default_route_cb(struct nl_object* obj, void* arg)
     inet_ntop(rtnl_route_get_family(route),nl_addr_get_binary_addr(rtnl_route_nh_get_gateway(nh)),(char*)r.gateway.c_str(),r.gateway.capacity());
 
 #ifdef _DEBUG_
+#ifdef ENABLE_RDKLOGGER
+    RDK_LOG( RDK_LOG_INFO,"LOG.RDK.NLMON","%s(%d):FOUND new default route PRIORITY = %u  INTERFACE = %d  GATEWAY = %s \n",
+              __FILE__, __LINE__,r.priority,r.interface_index,r.gateway.c_str());
+#else
     cout << "FOUND new default route PRIORITY = " << r.priority <<  " INTERFACE = " << r.interface_index << " GATEWAY = " << r.gateway.c_str() << endl;
+#endif
 #endif
 }
 void NetLinkIfc::link_change_cb(struct nl_cache *cache, struct nl_object *obj, int action, void *data)
@@ -756,28 +961,44 @@ void NetLinkIfc::link_change_cb(struct nl_cache *cache, struct nl_object *obj, i
     if (action == NL_ACT_NEW)
     {
 #ifdef _DEBUG_
-        cout<<"New Link Message "<<endl;
+#ifdef ENABLE_RDKLOGGER
+      RDK_LOG( RDK_LOG_INFO,"LOG.RDK.NLMON","%s(%d):New Link Message\n", __FILE__, __LINE__);
+#else
+      cout<<"New Link Message "<<endl;
+#endif
 #endif //_DEBUG_
         act_str = "add";
     }
     else if (action == NL_ACT_DEL)
     {
 #ifdef _DEBUG_
-        cout<<"Delete Link Message "<<endl;
+#ifdef ENABLE_RDKLOGGER
+      RDK_LOG( RDK_LOG_INFO,"LOG.RDK.NLMON","%s(%d):Delete Link Message\n", __FILE__, __LINE__);
+#else
+      cout<<"Delete Link Message "<<endl;
+#endif
 #endif //_DEBUG_
         act_str = "delete";
     }
     else if (action == NL_ACT_CHANGE)
     {
 #ifdef _DEBUG_
+#ifdef ENABLE_RDKLOGGER
+        RDK_LOG( RDK_LOG_INFO,"LOG.RDK.NLMON","%s(%d):Change Link Message\n", __FILE__, __LINE__);
+#else
         cout<<"Change Link Message "<<endl;
+#endif
 #endif //_DEBUG_
         act_str = "change";
     }
     else
     {
 #ifdef _DEBUG_
+#ifdef ENABLE_RDKLOGGER
+        RDK_LOG( RDK_LOG_INFO,"LOG.RDK.NLMON","%s(%d):Unknown Link Event Message\n", __FILE__, __LINE__);
+#else
         cout<<"Unknown Link Event Message "<<endl;
+#endif
 #endif //_DEBUG_
         return;
     }
@@ -795,28 +1016,44 @@ void NetLinkIfc::addr_change_cb(struct nl_cache *cache, struct nl_object *obj, i
     if (action == NL_ACT_NEW)
     {
 #ifdef _DEBUG_
-        cout<<"New Address Message "<<endl;
+#ifdef ENABLE_RDKLOGGER
+      RDK_LOG( RDK_LOG_INFO,"LOG.RDK.NLMON","%s(%d):New Address Message \n", __FILE__, __LINE__);
+#else
+      cout<<"New Address Message "<<endl;
+#endif
 #endif //_DEBUG_
         act_str = "add";
     }
     else if (action == NL_ACT_DEL)
     {
 #ifdef _DEBUG_
+#ifdef ENABLE_RDKLOGGER
+        RDK_LOG( RDK_LOG_INFO,"LOG.RDK.NLMON","%s(%d):Delete Address Message \n", __FILE__, __LINE__);
+#else
         cout<<"Delete Address Message "<<endl;
+#endif
 #endif //_DEBUG_
         act_str = "delete";
     }
     else if (action == NL_ACT_CHANGE)
     {
 #ifdef _DEBUG_
+#ifdef ENABLE_RDKLOGGER
+        RDK_LOG( RDK_LOG_INFO,"LOG.RDK.NLMON","%s(%d):Change Address Message \n", __FILE__, __LINE__);
+#else
         cout<<"Change Address Message "<<endl;
+#endif
 #endif //_DEBUG_
         act_str = "change";
     }
     else
     {
 #ifdef _DEBUG_
+#ifdef ENABLE_RDKLOGGER
+        RDK_LOG( RDK_LOG_INFO,"LOG.RDK.NLMON","%s(%d):Unknown Address Event Message \n", __FILE__, __LINE__);
+#else
         cout<<"Unknown Address Event Message "<<endl;
+#endif
 #endif //_DEBUG_
         return;
     }
@@ -832,28 +1069,44 @@ void NetLinkIfc::route_change_cb(struct nl_cache *cache, struct nl_object *obj, 
     if (action == NL_ACT_NEW)
     {
 #ifdef _DEBUG_
+#ifdef ENABLE_RDKLOGGER
+        RDK_LOG( RDK_LOG_INFO,"LOG.RDK.NLMON","%s(%d):New Route Message \n", __FILE__, __LINE__);
+#else
         cout<<"New Route Message "<<endl;
+#endif
 #endif //_DEBUG_
         act_str = "add";
     }
     else if (action == NL_ACT_DEL)
     {
 #ifdef _DEBUG_
+#ifdef ENABLE_RDKLOGGER
+        RDK_LOG( RDK_LOG_INFO,"LOG.RDK.NLMON","%s(%d):Delete Route Message \n", __FILE__, __LINE__);
+#else
         cout<<"Delete Route Message "<<endl;
+#endif
 #endif //_DEBUG_
         act_str = "delete";
     }
     else if (action == NL_ACT_CHANGE)
     {
 #ifdef _DEBUG_
+#ifdef ENABLE_RDKLOGGER
+        RDK_LOG( RDK_LOG_INFO,"LOG.RDK.NLMON","%s(%d):Change Route Message \n", __FILE__, __LINE__);
+#else
         cout<<"Change Route Message "<<endl;
+#endif
 #endif //_DEBUG_
         act_str = "change";
     }
     else
     {
 #ifdef _DEBUG_
+#ifdef ENABLE_RDKLOGGER
+        RDK_LOG( RDK_LOG_INFO,"LOG.RDK.NLMON","%s(%d):Unknown Route Event Message \n", __FILE__, __LINE__);
+#else
         cout<<"Unknown Route Event Message "<<endl;
+#endif
 #endif //_DEBUG_
         return;
     }
@@ -867,12 +1120,20 @@ void NetLinkIfc::processlink_rtnl(string action,struct rtnl_link* link)
 
     if (link == NULL)
     {
+#ifdef ENABLE_RDKLOGGER
+        RDK_LOG( RDK_LOG_INFO,"LOG.RDK.NLMON","%s(%d):Link Object in processlink_rtnl is NULL.\n", __FILE__, __LINE__);
+#else
         cout<<"Link Object in processlink_rtnl is NULL."<<endl;
+#endif
         return;
     }
 
     updateCloneConfig(m_link_cache,m_link_clone);
-    cout<<"Entering processlink_rtnl function"<<endl;
+#ifdef ENABLE_RDKLOGGER
+        RDK_LOG( RDK_LOG_INFO,"LOG.RDK.NLMON","%s(%d):Entering processlink_rtnl function\n", __FILE__, __LINE__);
+#else
+        cout<<"Entering processlink_rtnl function"<<endl;
+#endif
     //1. Interface name.
     string msgArgs;
     msgArgs.resize(IFNAMSIZ + 10,'\0');
@@ -886,9 +1147,14 @@ void NetLinkIfc::processlink_rtnl(string action,struct rtnl_link* link)
     {
         string ifcname(IFNAMSIZ,'\0');
         ifcname = rtnl_link_get_name(link);
+#ifdef ENABLE_RDKLOGGER
+        RDK_LOG( RDK_LOG_INFO,"LOG.RDK.NLMON","%s(%d):Exiting processlink_rtnl function . Received Delete message for link %s \n",
+                   __FILE__, __LINE__, ifcname.c_str());
+#else
         cout<<"Exiting processlink_rtnl function . Received Delete message for link "<<ifcname.c_str()<<endl;
-        return;
-    }   
+#endif
+     return;
+    }
     unsigned int operstate = rtnl_link_get_operstate(link);
     unsigned int flags = rtnl_link_get_flags(link);
     if (flags & IFF_UP)
@@ -907,27 +1173,36 @@ void NetLinkIfc::processlink_rtnl(string action,struct rtnl_link* link)
     {
         runStateMachine(eNETIFC_EVENT_LINK_ADMIN_DOWN, msgArgs);
     }
+#ifdef ENABLE_RDKLOGGER
+    RDK_LOG( RDK_LOG_INFO,"LOG.RDK.NLMON","%s(%d):Exiting processlink_rtnl function \n", __FILE__, __LINE__);
+#else
     cout<<"Exiting processlink_rtnl function"<<endl;
-
+#endif
 }
 void NetLinkIfc::processaddr_rtnl(string action, struct rtnl_addr* addr)
 {
     if (addr == NULL)
     {
-        cout<<"Addr Object in processaddr_rtnl is NULL."<<endl;
-        return;
+#ifdef ENABLE_RDKLOGGER
+    RDK_LOG( RDK_LOG_INFO,"LOG.RDK.NLMON","%s(%d):Addr Object in processaddr_rtnl is NULL \n", __FILE__, __LINE__);
+#else
+    cout<<"Addr Object in processaddr_rtnl is NULL."<<endl;
+#endif
+    return;
     }
 
 
-   
     updateCloneConfig(m_addr_cache,m_addr_clone);
     //fileter.
     if (action == "change")
     {
         return;
     }
+#ifdef ENABLE_RDKLOGGER
+    RDK_LOG( RDK_LOG_INFO,"LOG.RDK.NLMON","%s(%d):Entering processaddr_rtnl function \n", __FILE__, __LINE__);
+#else
     cout<<"Entering processaddr_rtnl function"<<endl;
-
+#endif
     int ifindex = rtnl_addr_get_ifindex(addr);
     std::string ifname;
     ifname.resize(IFNAMSIZ,'\0');
@@ -973,7 +1248,11 @@ void NetLinkIfc::processaddr_rtnl(string action, struct rtnl_addr* addr)
         event = rtnl_addr_get_family(addr) == AF_INET6 ? eNETIFC_EVENT_DELETE_IP6ADDR : eNETIFC_EVENT_DELETE_IPADDR;
     }
     runStateMachine(event,msgargs);
+#ifdef ENABLE_RDKLOGGER
+    RDK_LOG( RDK_LOG_INFO,"LOG.RDK.NLMON","%s(%d):Exiting processaddr_rtnl function \n", __FILE__, __LINE__);
+#else
     cout<<"Exiting processaddr_rtnl function"<<endl;
+#endif
 }
 
 void NetLinkIfc::processroute_rtnl(string action, struct rtnl_route* route)
@@ -987,7 +1266,11 @@ void NetLinkIfc::processroute_rtnl(string action, struct rtnl_route* route)
     bool dst_addr = false;
 
     updateCloneConfig(m_route_cache,m_route_clone);
+#ifdef ENABLE_RDKLOGGER
+    RDK_LOG( RDK_LOG_INFO,"LOG.RDK.NLMON","%s(%d):Entering processroute_rtnl function \n", __FILE__, __LINE__);
+#else
     cout<<"Entering processroute_rtnl function"<<endl;
+#endif
 
     gwaddr = "NA";
     prefsrc = "NA";
@@ -1007,9 +1290,14 @@ void NetLinkIfc::processroute_rtnl(string action, struct rtnl_route* route)
 
     if (oifindex == 0)
     {
+#ifdef ENABLE_RDKLOGGER
+        RDK_LOG( RDK_LOG_ERROR,"LOG.RDK.NLMON","%s(%d):Output Index is missing \n", __FILE__, __LINE__);
+        RDK_LOG( RDK_LOG_INFO,"LOG.RDK.NLMON","%s(%d):Exiting processroute_rtnl function \n", __FILE__, __LINE__);
+#else
         cout<<"Output Index is missing"<<endl;
         cout<<"Exiting processroute_rtnl function"<<endl;
-        return;
+#endif
+      return;
     }
     if ((rtnl_route_get_dst(route) != NULL) && (nl_addr_get_len(rtnl_route_get_dst(route)) > 0))
     {
@@ -1052,12 +1340,20 @@ void NetLinkIfc::processroute_rtnl(string action, struct rtnl_route* route)
 
     if ( dflt_route && !dst_addr )
     {
+#ifdef ENABLE_RDKLOGGER
+        RDK_LOG( RDK_LOG_INFO,"LOG.RDK.NLMON","%s(%d):Publishing default Route: Args msgargs = %s \n", __FILE__, __LINE__,msgargs.c_str());
+#else
         cout<<"Publishing default Route: Args msgargs = "<<msgargs.c_str()<<endl;
+#endif
         publish(NlType::dfltroute,msgargs);
     }
 
     runStateMachine(event,msgargs);
-    cout<<"Exiting processroute_rtnl function"<<endl;
+#ifdef ENABLE_RDKLOGGER
+       RDK_LOG( RDK_LOG_INFO,"LOG.RDK.NLMON","%s(%d):Exiting processroute_rtnl function \n", __FILE__, __LINE__);
+#else
+       cout<<"Exiting processroute_rtnl function"<<endl;
+#endif
 }
 
 void NetLinkIfc::link_init_cb(struct nl_object *obj , void * arg)
