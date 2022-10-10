@@ -53,7 +53,11 @@ if [ "$XCAM_MODEL" != "XHB1" ];then
 else
     export RDK_DUMP_SYMS=${RDK_PROJECT_ROOT_PATH}/utility/prebuilts/breakpad-prebuilts/x64/dump_syms
 fi
-export RDK_PATCHES=${RDK_PROJECT_ROOT_PATH}/build/components/opensource/patch
+if [ "$XCAM_MODEL" == "SCHC2" ]; then
+    export RDK_PATCHES=${RDK_PROJECT_ROOT_PATH}/build/components/amba/opensource/patch
+else
+    export RDK_PATCHES=${RDK_PROJECT_ROOT_PATH}/build/components/opensource/patch
+fi
 
 # default component name
 export RDK_COMPONENT_NAME=${RDK_COMPONENT_NAME-`basename $RDK_SOURCE_PATH`}
@@ -115,6 +119,15 @@ done
 
 ARGS=$@
 
+# component-specific vars
+if [ "$XCAM_MODEL" == "SCHC2" ]; then
+    export CROSS_COMPILE=$RDK_TOOLCHAIN_PATH/bin/arm-linux-gnueabihf-
+    export CC=${CROSS_COMPILE}gcc
+    export CXX=${CROSS_COMPILE}g++
+    export DEFAULT_HOST=arm-linux
+    export PKG_CONFIG_PATH="$RDK_PROJECT_ROOT_PATH/opensource/lib/pkgconfig/:$RDK_FSROOT_PATH/img/fs/shadow_root/usr/local/lib/pkgconfig/:$RDK_TOOLCHAIN_PATH/lib/pkgconfig/:$PKG_CONFIG_PATH"
+fi
+
 # functional modules
 function configure()
 {
@@ -134,8 +147,14 @@ function configure()
     rm -f configure
     autoconf
     configure_options=" "
-    configure_options="--host=arm-linux --target=arm-linuxi --enable-rdklogger"
-
+    if [ $XCAM_MODEL == "SCHC2" ]; then
+        configure_options="--host=$DEFAULT_HOST --target=$DEFAULT_HOST --enable-rdklogger"
+        export LDFLAGS+="-L${RDK_PROJECT_ROOT_PATH}/rdklogger/src/.libs -lrdkloggers -Wl,-rpath-link=${RDK_PROJECT_ROOT_PATH}/opensource/lib -L${RDK_PROJECT_ROOT_PATH}/breakpadwrap -lbreakpadwrap"
+        export CXXFLAGS+="-I${RDK_PROJECT_ROOT_PATH}/rdklogger/include"
+        export CFLAGS+="-I${RDK_PROJECT_ROOT_PATH}/opensource/include -I${RDK_PROJECT_ROOT_PATH}opensource/include/cjson/"
+    else
+        configure_options="--host=arm-linux --target=arm-linuxi --enable-rdklogger"
+    fi
     ./configure --prefix=${RDK_FSROOT_PATH}/usr --sysconfdir=${RDK_FSROOT_PATH}/etc $configure_options
     cd $pd
 }
