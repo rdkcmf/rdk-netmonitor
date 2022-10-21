@@ -1130,7 +1130,7 @@ void NetLinkIfc::processlink_rtnl(string action,struct rtnl_link* link)
 
     updateCloneConfig(m_link_cache,m_link_clone);
 #ifdef ENABLE_RDKLOGGER
-        RDK_LOG( RDK_LOG_INFO,"LOG.RDK.NLMON","%s(%d):Entering processlink_rtnl function\n", __FILE__, __LINE__);
+        RDK_LOG( RDK_LOG_DEBUG,"LOG.RDK.NLMON","%s(%d):Entering processlink_rtnl function\n", __FILE__, __LINE__);
 #else
         cout<<"Entering processlink_rtnl function"<<endl;
 #endif
@@ -1148,7 +1148,7 @@ void NetLinkIfc::processlink_rtnl(string action,struct rtnl_link* link)
         string ifcname(IFNAMSIZ,'\0');
         ifcname = rtnl_link_get_name(link);
 #ifdef ENABLE_RDKLOGGER
-        RDK_LOG( RDK_LOG_INFO,"LOG.RDK.NLMON","%s(%d):Exiting processlink_rtnl function . Received Delete message for link %s \n",
+        RDK_LOG( RDK_LOG_DEBUG,"LOG.RDK.NLMON","%s(%d):Exiting processlink_rtnl function . Received Delete message for link %s \n",
                    __FILE__, __LINE__, ifcname.c_str());
 #else
         cout<<"Exiting processlink_rtnl function . Received Delete message for link "<<ifcname.c_str()<<endl;
@@ -1174,7 +1174,7 @@ void NetLinkIfc::processlink_rtnl(string action,struct rtnl_link* link)
         runStateMachine(eNETIFC_EVENT_LINK_ADMIN_DOWN, msgArgs);
     }
 #ifdef ENABLE_RDKLOGGER
-    RDK_LOG( RDK_LOG_INFO,"LOG.RDK.NLMON","%s(%d):Exiting processlink_rtnl function \n", __FILE__, __LINE__);
+    RDK_LOG( RDK_LOG_DEBUG,"LOG.RDK.NLMON","%s(%d):Exiting processlink_rtnl function \n", __FILE__, __LINE__);
 #else
     cout<<"Exiting processlink_rtnl function"<<endl;
 #endif
@@ -1199,7 +1199,7 @@ void NetLinkIfc::processaddr_rtnl(string action, struct rtnl_addr* addr)
         return;
     }
 #ifdef ENABLE_RDKLOGGER
-    RDK_LOG( RDK_LOG_INFO,"LOG.RDK.NLMON","%s(%d):Entering processaddr_rtnl function \n", __FILE__, __LINE__);
+    RDK_LOG( RDK_LOG_DEBUG,"LOG.RDK.NLMON","%s(%d):Entering processaddr_rtnl function \n", __FILE__, __LINE__);
 #else
     cout<<"Entering processaddr_rtnl function"<<endl;
 #endif
@@ -1249,7 +1249,7 @@ void NetLinkIfc::processaddr_rtnl(string action, struct rtnl_addr* addr)
     }
     runStateMachine(event,msgargs);
 #ifdef ENABLE_RDKLOGGER
-    RDK_LOG( RDK_LOG_INFO,"LOG.RDK.NLMON","%s(%d):Exiting processaddr_rtnl function \n", __FILE__, __LINE__);
+    RDK_LOG( RDK_LOG_DEBUG,"LOG.RDK.NLMON","%s(%d):Exiting processaddr_rtnl function \n", __FILE__, __LINE__);
 #else
     cout<<"Exiting processaddr_rtnl function"<<endl;
 #endif
@@ -1267,7 +1267,7 @@ void NetLinkIfc::processroute_rtnl(string action, struct rtnl_route* route)
 
     updateCloneConfig(m_route_cache,m_route_clone);
 #ifdef ENABLE_RDKLOGGER
-    RDK_LOG( RDK_LOG_INFO,"LOG.RDK.NLMON","%s(%d):Entering processroute_rtnl function \n", __FILE__, __LINE__);
+    RDK_LOG( RDK_LOG_DEBUG,"LOG.RDK.NLMON","%s(%d):Entering processroute_rtnl function \n", __FILE__, __LINE__);
 #else
     cout<<"Entering processroute_rtnl function"<<endl;
 #endif
@@ -1292,7 +1292,7 @@ void NetLinkIfc::processroute_rtnl(string action, struct rtnl_route* route)
     {
 #ifdef ENABLE_RDKLOGGER
         RDK_LOG( RDK_LOG_ERROR,"LOG.RDK.NLMON","%s(%d):Output Index is missing \n", __FILE__, __LINE__);
-        RDK_LOG( RDK_LOG_INFO,"LOG.RDK.NLMON","%s(%d):Exiting processroute_rtnl function \n", __FILE__, __LINE__);
+        RDK_LOG( RDK_LOG_DEBUG,"LOG.RDK.NLMON","%s(%d):Exiting processroute_rtnl function \n", __FILE__, __LINE__);
 #else
         cout<<"Output Index is missing"<<endl;
         cout<<"Exiting processroute_rtnl function"<<endl;
@@ -1350,7 +1350,7 @@ void NetLinkIfc::processroute_rtnl(string action, struct rtnl_route* route)
 
     runStateMachine(event,msgargs);
 #ifdef ENABLE_RDKLOGGER
-       RDK_LOG( RDK_LOG_INFO,"LOG.RDK.NLMON","%s(%d):Exiting processroute_rtnl function \n", __FILE__, __LINE__);
+       RDK_LOG( RDK_LOG_DEBUG,"LOG.RDK.NLMON","%s(%d):Exiting processroute_rtnl function \n", __FILE__, __LINE__);
 #else
        cout<<"Exiting processroute_rtnl function"<<endl;
 #endif
