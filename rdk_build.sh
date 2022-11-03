@@ -204,6 +204,13 @@ function install()
     cp ./.libs/nlmon ${RDK_FSROOT_PATH}/usr/bin/
     cp nlmon_rdkc.cfg ${RDK_FSROOT_PATH}/etc/nlmon.cfg
     cp -p addressmonitor.sh ${RDK_FSROOT_PATH}/lib/rdk/addressmonitor.sh
+    if [ "$XCAM_MODEL" == "SCHC2" ]; then
+        cp -p ./xcam2/netmonitor_recovery.sh ${RDK_FSROOT_PATH}/lib/rdk/netmonitor_recovery.sh
+    elif [ "$XCAM_MODEL" == "XHC3" ]; then
+        cp -p ./xcam3/netmonitor_recovery.sh ${RDK_FSROOT_PATH}/lib/rdk/netmonitor_recovery.sh
+    elif [ "$XCAM_MODEL" == "XHB1" ]; then
+        cp -p ./dbc/netmonitor_recovery.sh ${RDK_FSROOT_PATH}/lib/rdk/netmonitor_recovery.sh
+    fi
     cp ./.libs/libnlmonitor.so* ${RDK_FSROOT_PATH}/usr/lib/
 }
 # run the logic
