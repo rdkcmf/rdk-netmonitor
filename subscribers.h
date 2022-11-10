@@ -60,6 +60,7 @@ public:
       cmd.erase(std::remove_if(cmd.begin(),cmd.end(),[](char c) {
           return !(isalnum(c) || (c == '/') || (c == ' ') || (c == ':') || (c == '-') || (c == '.') || (c == '@') || (c == '_') || (c == '[') || (c == ']'));}),cmd.end());
 
+      cmd += " &";
 #ifdef ENABLE_RDKLOGGER
       RDK_LOG( RDK_LOG_INFO,"LOG.RDK.NLMON","%s(%d):COMMAND After Sanitizing= %s \n", __FILE__, __LINE__ ,cmd.c_str());
 #else
