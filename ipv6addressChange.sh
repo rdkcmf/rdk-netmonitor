@@ -85,7 +85,9 @@ if [ "x$cmd" == "xdelete" ] && [ "x$flags" == "xglobal" ]; then
          done
          cd $pd
 
-       if [ "x$globalip" = "x" ]; then
+       # cleaning up all the spaces
+       gIp=`echo $globalip | xargs`
+       if [ "x$gIp" = "x" ]; then
           echo " Box was previously in IPv6 mode and now in IPv4 mode. Clearing IPv6 flags for $ifc"
           rm -f  /tmp/estb_ipv6
           rm -f /tmp/addressaquired_ipv6
@@ -103,7 +105,9 @@ if [ "x$cmd" == "xdelete" ] && [ "x$flags" == "xglobal" ]; then
            globalip="$globalip $lglobal"
        done
        cd $pd
-       if [ "x$globalip" = "x" ]; then
+       # cleaning up all the spaces
+       gIp=`echo $globalip | xargs`
+       if [ "x$gIp" = "x" ]; then
           echo " Box was previously in IPv4 mode and now in IPv6 mode. Clearing IPv4 flags for $ifc"
           rm -f /tmp/estb_ipv4
           rm -f /tmp/addressaquired_ipv4
