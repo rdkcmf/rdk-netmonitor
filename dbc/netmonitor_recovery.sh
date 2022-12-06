@@ -1,19 +1,17 @@
 #/bin/bash
 
 . /lib/rdk/utils.sh
-. /etc/include.properties
 . /lib/rdk/t2Shared_api.sh
 
 LOG_FILE=$LOG_PATH/net_monitor_log.txt
 
 #we need to ensure to have more sleep time so that we can see whether we get RA from gateway or not .
 #If camera misses to get the RA within time period ,
-#we can have xw3_monitor beingc alled
+#we can have wpa_supplicant service to restart.
 
 sleep 60
 if [ -f "/opt/recover_ipv6" ]; then
-    /etc/init.d/wpa_supplicant.service restart
-    echo `/bin/timestamp` "Restarting wpa_supplicant service  ... " >> $LOG_FILE
+    echo "`/bin/timestamp` Restarting wpa_supplicant service to recover ipv6 address " >> $LOG_FILE
     t2CountNotify "SYS_INFO_WpaSupRestart"
-    rm /opt/recover_ipv6
+    /etc/init.d/wpa_supplicant.service restart
 fi
