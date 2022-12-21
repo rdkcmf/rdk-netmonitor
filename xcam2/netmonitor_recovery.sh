@@ -13,5 +13,5 @@ sleep 60
 if [ -f "/opt/recover_ipv6" ]; then
     echo "`/bin/timestamp` Reloading xw3_monitor to recover ipv6 address " >> $LOG_FILE
     t2CountNotify "SYS_INFO_XW3MonReload"
-    xw3_monitor reload
+    xw3_monitor xwreload
 fi
