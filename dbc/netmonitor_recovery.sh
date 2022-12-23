@@ -11,7 +11,7 @@ LOG_FILE=$LOG_PATH/net_monitor_log.txt
 
 sleep 60
 if [ -f "/opt/recover_ipv6" ]; then
-    echo "`/bin/timestamp` Restarting wpa_supplicant service to recover ipv6 address " >> $LOG_FILE
-    t2CountNotify "SYS_INFO_WpaSupRestart"
-    /etc/init.d/wpa_supplicant.service restart
+    echo "`/bin/timestamp` Restarting netsrvmgr service to recover ipv6 address " >> $LOG_FILE
+    t2CountNotify "WIFI_ERR_NetSrvMgr"
+    /etc/init.d/netsrvmgr-service restart
 fi

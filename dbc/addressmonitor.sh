@@ -15,6 +15,7 @@ if [ "$2" = "ipv6" ] && [ "$3" = "wlan0" ] && [ "$5" = "global" ]; then
 fi
 
 if [ "$1" = "delete" ] && [ "$2" = "ipv6" ] && [ "$3" = "wlan0" ] && [ "$5" = "global" ]; then
+    echo -e "`/bin/timestamp` \n`ifconfig`" >> $LOG_FILE
     Device_Uptime=$(Uptime)
     if [ $Device_Uptime -ge $Uptime_Threshold ]; then
         echo "`/bin/timestamp` After ten minutes executing netmonitor recovery script file to recover ipv6 address" >> $LOG_FILE
@@ -26,4 +27,5 @@ fi
 if [ -f "/opt/recover_ipv6" ] && [ "$1" = "add" ] && [ "$2" = "ipv6" ] && [ "$3" = "wlan0" ] && [ "$5" = "global" ]; then
     echo "`/bin/timestamp` Delete recoveripv6 file after adding the ipv6 address" >> $LOG_FILE
     rm /opt/recover_ipv6
+    echo -e  "`/bin/timestamp` \n`ifconfig`" >> $LOG_FILE
 fi
