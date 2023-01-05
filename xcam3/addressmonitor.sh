@@ -18,9 +18,14 @@ if [ "$1" = "delete" ] && [ "$2" = "ipv6" ] && [ "$3" = "wlan0" ] && [ "$5" = "g
     echo -e "`/bin/timestamp`\n `ifconfig`" >> $LOG_FILE
     Device_Uptime=$(Uptime)
     if [ $Device_Uptime -ge $Uptime_Threshold ]; then
-        echo "`/bin/timestamp` After ten minutes executing netmonitor recovery script file to recover ipv6 address" >> $LOG_FILE
-        touch /opt/recover_ipv6
-        sh /lib/rdk/netmonitor_recovery.sh &
+        currentipv6=`getIPV6Address`
+        if [ -z "$currentipv6" ]; then
+            echo "`/bin/timestamp` After ten minutes executing netmonitor recovery script file to recover ipv6 address" >> $LOG_FILE
+            touch /opt/recover_ipv6
+            sh /lib/rdk/netmonitor_recovery.sh &
+        else
+            echo "`/bin/timestamp` Ignoring delete event since ipv6 address is already available" >> $LOG_FILE
+        fi
     fi
 fi
 
